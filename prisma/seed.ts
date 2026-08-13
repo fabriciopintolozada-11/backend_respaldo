@@ -43,7 +43,7 @@ async function main() {
           customerId: customers[index].id,
           receptionistId: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
           initialComplaint: `Revisión general de ejemplo ${index + 1}`,
-          status: index % 3 === 0 ? 'IN_PROGRESS' : 'OPEN',
+           status: 'RECIBIDO',
         },
       }),
     ),

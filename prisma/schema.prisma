@@ -35,7 +35,7 @@ model WorkOrder {
   customerId      String   @db.Uuid
   receptionistId  String   @db.Uuid
   initialComplaint String
-  status          String   @default("OPEN") @db.VarChar(20)
+  status          String   @default("RECIBIDO") @db.VarChar(30)
   createdAt       DateTime @default(now()) @db.Timestamptz(6)
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
   customer        Customer @relation(fields: [customerId], references: [id])
