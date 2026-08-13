@@ -35,6 +35,9 @@ async function main() {
     ),
   );
 
+  const mechanicA = '11111111-1111-1111-1111-111111111111';
+  const mechanicB = '22222222-2222-2222-2222-222222222222';
+
   const workOrders = await Promise.all(
     vehicles.map((vehicle, index) =>
       prisma.workOrder.create({
@@ -43,7 +46,9 @@ async function main() {
           customerId: customers[index].id,
           receptionistId: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
           initialComplaint: `Revisión general de ejemplo ${index + 1}`,
-           status: 'RECIBIDO',
+          status: 'RECIBIDO',
+          mechanicId: index % 3 === 0 ? mechanicA : index % 3 === 1 ? mechanicB : null,
+          assignedAt: index % 3 === 2 ? null : new Date(),
         },
       }),
     ),
