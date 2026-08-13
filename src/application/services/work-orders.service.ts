@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { RegisterVehicleEntryDto } from './dto/register-vehicle-entry.dto';
-import { ConflictError, WorkOrdersRepository } from './work-orders.repository';
+import { RegisterVehicleEntryDto } from '../../presentation/dto/register-vehicle-entry.dto';
+import { ConflictError, WorkOrdersRepository } from '../../infraestructure/repositories/work-orders.repository';
 
 @Injectable()
 export class RegisterVehicleEntryService {

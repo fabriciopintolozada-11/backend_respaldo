@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
-import { RegisterVehicleEntryDto } from './dto/register-vehicle-entry.dto';
+import { RegisterVehicleEntryDto } from '../../presentation/dto/register-vehicle-entry.dto';
 
 @Injectable()
 export class WorkOrdersRepository {

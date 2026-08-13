@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
-import { ReceptionistGuard } from '../auth/receptionist.guard';
-import { RegisterVehicleEntryDto } from './dto/register-vehicle-entry.dto';
-import { RegisterVehicleEntryService } from './work-orders.service';
+import { ReceptionistGuard } from '../guards/receptionist.guard';
+import { RegisterVehicleEntryDto } from '../dto/register-vehicle-entry.dto';
+import { RegisterVehicleEntryService } from '../../application/services/work-orders.service';
 
 @Controller()
 @UseGuards(ReceptionistGuard)

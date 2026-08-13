@@ -1,8 +1,8 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { HealthRoutesModule } from './routes/health.routes';
-import { RequestLoggingMiddleware } from './middlewares/request-logging.middleware';
-import { DatabaseModule } from './database/database.module';
-import { WorkOrdersModule } from './work-orders/work-orders.module';
+import { HealthRoutesModule } from './presentation/routes/health.routes';
+import { RequestLoggingMiddleware } from './presentation/middlewares/request-logging.middleware';
+import { DatabaseModule } from './infraestructure/database/database.module';
+import { WorkOrdersModule } from './presentation/work-orders/work-orders.module';
 
 @Module({
   imports: [DatabaseModule, HealthRoutesModule, WorkOrdersModule],
