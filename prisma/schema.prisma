@@ -30,15 +30,19 @@ model Vehicle {
 }
 
 model WorkOrder {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  vehicleId       String   @db.Uuid
-  customerId      String   @db.Uuid
-  receptionistId  String   @db.Uuid
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicleId        String    @db.Uuid
+  customerId       String    @db.Uuid
+  receptionistId   String    @db.Uuid
   initialComplaint String
-  status          String   @default("RECIBIDO") @db.VarChar(30)
-  createdAt       DateTime @default(now()) @db.Timestamptz(6)
-  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
-  customer        Customer @relation(fields: [customerId], references: [id])
+  status           String    @default("RECIBIDO") @db.VarChar(30)
+  mechanicId       String?   @db.Uuid
+  assignedAt       DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
+  customer         Customer  @relation(fields: [customerId], references: [id])
+
+  @@index([mechanicId])
 }
 
 model TechnicalHistory {
