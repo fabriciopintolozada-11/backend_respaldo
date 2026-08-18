@@ -9,24 +9,24 @@ datasource db {
 }
 
 model Customer {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identification String        @unique @db.VarChar(50)
-  name           String        @db.VarChar(150)
-  phone          String?       @db.VarChar(30)
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identification String      @unique @db.VarChar(50)
+  name           String      @db.VarChar(150)
+  phone          String?     @db.VarChar(30)
   vehicles       Vehicle[]
   workOrders     WorkOrder[]
 }
 
 model Vehicle {
-  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId      String             @db.Uuid
-  plate           String             @unique @db.VarChar(10)
-  brand           String             @db.VarChar(80)
-  model           String             @db.VarChar(80)
-  year            Int                @db.SmallInt
-  isFullyElectric Boolean            @default(false)
-  customer        Customer           @relation(fields: [customerId], references: [id])
-  workOrders      WorkOrder[]
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId       String             @db.Uuid
+  plate            String             @unique @db.VarChar(10)
+  brand            String             @db.VarChar(80)
+  model            String             @db.VarChar(80)
+  year             Int                @db.SmallInt
+  isFullyElectric  Boolean            @default(false)
+  customer         Customer           @relation(fields: [customerId], references: [id])
+  workOrders       WorkOrder[]
   technicalHistory TechnicalHistory[]
 }
 
@@ -40,10 +40,18 @@ model WorkOrder {
   mechanicId       String?   @db.Uuid
   assignedAt       DateTime? @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
   vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
   customer         Customer  @relation(fields: [customerId], references: [id])
+  mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
 
   @@index([mechanicId])
+}
+
+model Mechanic {
+  id         String      @id @db.Uuid
+  isActive   Boolean     @default(true)
+  workOrders WorkOrder[]
 }
 
 model TechnicalHistory {
