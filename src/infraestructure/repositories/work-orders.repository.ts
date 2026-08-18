@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { RegisterVehicleEntryDto } from '../../presentation/dto/register-vehicle-entry.dto';
+import { AssignWorkOrderResponseDto } from '../../presentation/dto/assign-work-order.dto';
 
 @Injectable()
 export class WorkOrdersRepository {
@@ -32,6 +33,65 @@ export class WorkOrdersRepository {
       return order;
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
   }
+
+  async assign(workOrderId: string, mechanicId: string): Promise<AssignWorkOrderResponseDto> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const workOrder = (
+        await client.query<{ id: string; mechanicId: string | null; status: string }>(
+          'SELECT "id", "mechanicId", "status" FROM "WorkOrder" WHERE "id" = $1 FOR UPDATE',
+          [workOrderId],
+        )
+      ).rows[0];
+
+      if (!workOrder) throw new WorkOrderNotFoundError('Work order not found');
+      if (workOrder.mechanicId) throw new WorkOrderAlreadyAssignedError('Work order is already assigned');
+      if (workOrder.status !== 'RECIBIDO') {
+        throw new WorkOrderNotAssignableError('Work order is not in an assignable state');
+      }
+
+      const mechanic = (
+        await client.query<{ id: string; isActive: boolean }>(
+          'SELECT "id", "isActive" FROM "Mechanic" WHERE "id" = $1 FOR SHARE',
+          [mechanicId],
+        )
+      ).rows[0];
+
+      if (!mechanic) throw new MechanicNotFoundError('Mechanic not found');
+      if (!mechanic.isActive) throw new MechanicUnavailableError('Mechanic cannot receive work orders');
+
+      const assignedOrder = (
+        await client.query<AssignWorkOrderResponseDto>(
+          `UPDATE "WorkOrder"
+           SET "mechanicId" = $2, "assignedAt" = CURRENT_TIMESTAMP, "status" = 'ASIGNADA',
+               "updatedAt" = CURRENT_TIMESTAMP
+           WHERE "id" = $1
+           RETURNING "id", "mechanicId" AS "mecanicoId", "status", "updatedAt"`,
+          [workOrderId, mechanicId],
+        )
+      ).rows[0];
+
+      if (!assignedOrder) throw new WorkOrderNotFoundError('Work order not found');
+      await client.query('COMMIT');
+      return assignedOrder;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Preserve the business error when the transaction cannot be rolled back.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 export class ConflictError extends Error {}
+export class WorkOrderNotFoundError extends Error {}
+export class WorkOrderNotAssignableError extends Error {}
+export class WorkOrderAlreadyAssignedError extends Error {}
+export class MechanicNotFoundError extends Error {}
+export class MechanicUnavailableError extends Error {}
