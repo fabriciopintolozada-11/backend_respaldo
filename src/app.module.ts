@@ -8,9 +8,12 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AssignedOrdersModule } from './modules/work-orders/assigned-orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { ConfigModule } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import Joi from 'joi';
 
 @Module({
-  imports: [DatabaseModule, PrismaModule, HealthRoutesModule, WorkOrdersModule, AssignedOrdersModule, AuthModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), DatabaseModule, PrismaModule, HealthRoutesModule, WorkOrdersModule, AssignedOrdersModule, AuthModule],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule implements NestModule {

@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { MechanicOrdersRepository } from './repositories/mechanic-orders.repository';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { AssignedWorkOrderRow, MechanicOrdersRepository } from './repositories/mechanic-orders.repository';
 import { ListAssignedWorkOrdersResponseDto } from './dto/list-assigned-work-orders.response.dto';
 import { QueryAssignedWorkOrdersDto } from './dto/query-assigned-work-orders.dto';
 
@@ -23,7 +23,7 @@ export class AssignedOrdersService {
     ]);
 
     return {
-      data: rows.map((row) => ({
+      data: rows.map((row: AssignedWorkOrderRow) => ({
         id: row.id,
         vehicleId: row.vehicleId,
         plate: row.vehicle.plate,
@@ -35,5 +35,11 @@ export class AssignedOrdersService {
       page,
       pageSize,
     };
+  }
+
+  async getAssignedDetail(mechanicId: string, workOrderId: string) {
+    const order = await this.repository.findAssignedDetail(mechanicId, workOrderId);
+    if (!order) throw new NotFoundException('Assigned work order not found');
+    return order;
   }
 }

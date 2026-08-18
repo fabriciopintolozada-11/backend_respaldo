@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.module';
 import { RegisterVehicleEntryDto } from '../../presentation/dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../../presentation/dto/assign-work-order.dto';
@@ -24,8 +24,9 @@ export class WorkOrdersRepository {
       await client.query('BEGIN');
       let customer = (await client.query('SELECT "id" FROM "Customer" WHERE "identification" = $1 FOR UPDATE', [dto.customer.identification])).rows[0];
       if (!customer) customer = (await client.query('INSERT INTO "Customer" ("identification", "name", "phone") VALUES ($1,$2,$3) RETURNING "id"', [dto.customer.identification, dto.customer.name, dto.customer.phone ?? null])).rows[0];
-      let vehicle = (await client.query('SELECT "id", "isFullyElectric" FROM "Vehicle" WHERE "plate" = $1 FOR UPDATE', [dto.plate])).rows[0];
-      if (vehicle && vehicle.is_fully_electric) throw new ConflictError('Fully electric vehicles are not accepted');
+      let vehicle = (await client.query('SELECT "id", "customerId", "isFullyElectric" FROM "Vehicle" WHERE "plate" = $1 FOR UPDATE', [dto.plate])).rows[0];
+      if (vehicle && vehicle.isFullyElectric) throw new ConflictError('Fully electric vehicles are not accepted');
+      if (vehicle && vehicle.customerId !== customer.id) throw new ConflictError('Vehicle is registered to another customer');
       if (!vehicle) vehicle = (await client.query('INSERT INTO "Vehicle" ("customerId", "plate", "brand", "model", "year", "isFullyElectric") VALUES ($1,$2,$3,$4,$5,$6) RETURNING "id"', [customer.id, dto.plate, dto.vehicle.brand, dto.vehicle.model, dto.vehicle.year, dto.vehicle.isFullyElectric])).rows[0];
       if (dto.vehicle.isFullyElectric) throw new ConflictError('Fully electric vehicles are not accepted');
        const order = (await client.query('INSERT INTO "WorkOrder" ("vehicleId", "customerId", "receptionistId", "initialComplaint", "status") VALUES ($1,$2,$3,$4,\'RECIBIDO\') RETURNING "id", "vehicleId", "customerId", "status", "initialComplaint", "createdAt"', [vehicle.id, customer.id, receptionistId, dto.initialComplaint])).rows[0];

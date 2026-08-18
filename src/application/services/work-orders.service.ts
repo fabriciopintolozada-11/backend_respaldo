@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { RegisterVehicleEntryDto } from '../../presentation/dto/register-vehicle-entry.dto';
 import { ConflictError, WorkOrdersRepository } from '../../infraestructure/repositories/work-orders.repository';
 import { normalizePlate, validateVehicleCanBeReceived } from '../../domain/work-orders/vehicle-entry.rules';
@@ -11,6 +11,6 @@ export class RegisterVehicleEntryService {
     const plate = normalizePlate(dto.plate);
     validateVehicleCanBeReceived(dto.vehicle.isFullyElectric);
     try { return await this.repository.create({ ...dto, plate }, receptionistId); }
-    catch (error) { if (error instanceof ConflictError) throw new ConflictException(error.message); throw error; }
+    catch (error) { if (error instanceof ConflictError) throw new UnprocessableEntityException(error.message); throw error; }
   }
 }
