@@ -12,7 +12,6 @@ export class VehicleStatusRepository {
       where: {
         vehicle: { plate },
         customer: { identification },
-        status: { notIn: ['FINALIZADO', 'LISTO_ENTREGA'] },
       },
       orderBy: { createdAt: 'desc' },
       include: { vehicle: true, customer: true },
