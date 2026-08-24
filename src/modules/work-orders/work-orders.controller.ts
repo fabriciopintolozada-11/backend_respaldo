@@ -5,25 +5,27 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { RegisterVehicleEntryDto } from '../dto/register-vehicle-entry.dto';
-import { RegisterVehicleEntryService } from '../../application/services/work-orders.service';
+import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-vehicle-entry.dto';
+import { WorkOrdersService } from './work-orders.service';
 
-@Controller()
 @ApiTags('work-orders')
+@Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.RECEPTIONIST)
 export class WorkOrdersController {
-  constructor(private readonly service: RegisterVehicleEntryService) {}
+  constructor(private readonly service: WorkOrdersService) {}
+
   @Get('vehicles/:plate/history')
   @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
   @ApiResponse({ status: 200 })
-  getHistory(@Param('plate') plate: string) { return this.service.getHistory(plate); }
+  getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
+
   @Post('work-orders')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register vehicle entry and create work order (US-01, RN-01, RN-18)' })
-  @ApiResponse({ status: 201 })
+  @ApiResponse({ status: 201, type: WorkOrderResponseDto })
   @ApiResponse({ status: 422, description: 'Electric vehicles are not accepted' })
-  register(@Body() dto: RegisterVehicleEntryDto, @Req() request: Request) {
-    return this.service.register(dto, request.user.id);
+  register(@Body() dto: RegisterVehicleEntryDto, @Req() request: Request): Promise<WorkOrderResponseDto> {
+    return this.service.registerVehicleEntry(dto, request.user.id);
   }
 }
