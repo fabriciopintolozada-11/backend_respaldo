@@ -10,6 +10,8 @@ const testPlate = `E${String(Date.now()).slice(-7)}`;
 let prisma: PrismaService;
 let customerId: string;
 let vehicleId: string;
+let inProcessWorkOrderId: string;
+let finalizedWorkOrderId: string;
 
 describe('VehicleStatusController (e2e) — US-02', () => {
   let app: INestApplication;
@@ -31,12 +33,14 @@ describe('VehicleStatusController (e2e) — US-02', () => {
       data: { customerId, plate: testPlate, brand: 'Toyota', model: 'Corolla', year: 2020 },
     });
     vehicleId = vehicle.id;
-    await prisma.workOrder.createMany({
-      data: [
-        { vehicleId, customerId, receptionistId: '00000000-0000-0000-0000-000000000001', initialComplaint: 'Falla de prueba', status: 'EN_REPARACION', createdAt: new Date(Date.now() - 1000) },
-        { vehicleId, customerId, receptionistId: '00000000-0000-0000-0000-000000000001', initialComplaint: 'Falla finalizada', status: 'FINALIZADO', createdAt: new Date() },
-      ],
+    const inProcessWorkOrder = await prisma.workOrder.create({
+      data: { vehicleId, customerId, receptionistId: '00000000-0000-0000-0000-000000000001', initialComplaint: 'Falla de prueba', status: 'EN_REPARACION', createdAt: new Date(Date.now() - 1000) },
     });
+    inProcessWorkOrderId = inProcessWorkOrder.id;
+    const finalizedWorkOrder = await prisma.workOrder.create({
+      data: { vehicleId, customerId, receptionistId: '00000000-0000-0000-0000-000000000001', initialComplaint: 'Falla finalizada', status: 'FINALIZADO', createdAt: new Date() },
+    });
+    finalizedWorkOrderId = finalizedWorkOrder.id;
   });
 
   afterAll(async () => {
@@ -64,12 +68,13 @@ describe('VehicleStatusController (e2e) — US-02', () => {
 
   it('GET /api/v1/public/vehicle-status rejects a valid plate with an incorrect document', async () => {
     await request(app.getHttpServer())
-      .get('/api/v1/public/vehicle-status?plate=EX0001&customerIdentification=INCORRECTO')
+      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=INCORRECTO`)
       .expect(404);
   });
 
   it('GET /api/v1/public/vehicle-status returns the current stage for an order in process', async () => {
-    await prisma.workOrder.updateMany({ where: { vehicleId }, data: { status: 'EN_REPARACION' } });
+    await prisma.workOrder.update({ where: { id: inProcessWorkOrderId }, data: { status: 'EN_REPARACION' } });
+    await prisma.workOrder.update({ where: { id: finalizedWorkOrderId }, data: { status: 'CERRADA' } });
 
     const response = await request(app.getHttpServer())
       .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=${testIdentification}`)
@@ -80,7 +85,7 @@ describe('VehicleStatusController (e2e) — US-02', () => {
   });
 
   it('GET /api/v1/public/vehicle-status returns the current stage and pickup status when finalized', async () => {
-    await prisma.workOrder.updateMany({ where: { vehicleId }, data: { status: 'FINALIZADO' } });
+    await prisma.workOrder.update({ where: { id: finalizedWorkOrderId }, data: { status: 'FINALIZADO' } });
 
     const response = await request(app.getHttpServer())
       .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=${testIdentification}`)
