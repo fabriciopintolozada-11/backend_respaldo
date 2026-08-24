@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class QueryVehicleStatusDto {
   @ApiProperty({
-    description: 'Vehicle license plate used for the public lookup (RN-17)',
+    description: 'Placa del vehículo para la consulta pública (RN-17)',
     example: '1234ABC',
   })
   @IsString()
@@ -11,10 +11,10 @@ export class QueryVehicleStatusDto {
   plate!: string;
 
   @ApiProperty({
-    description: 'Customer identification document used for the public lookup (RN-17)',
+    description: 'Documento de identidad del cliente para la consulta pública (RN-17)',
     example: '1234567',
   })
   @IsString()
   @IsNotEmpty()
-  identification!: string;
+  customerIdentification!: string;
 }
