@@ -21,12 +21,6 @@ export class VehicleStatusResponseDto {
   @ApiProperty({ type: VehicleSummaryDto, description: 'Resumen del vehículo' })
   vehicle!: VehicleSummaryDto;
 
-  @ApiProperty({ description: 'Nombre del cliente' })
-  customerName!: string;
-
-  @ApiProperty({ description: 'Reclamo inicial informado por el cliente' })
-  initialComplaint!: string;
-
   @ApiProperty({ description: 'Fecha de creación de la Orden de Trabajo' })
   createdAt!: Date;
 

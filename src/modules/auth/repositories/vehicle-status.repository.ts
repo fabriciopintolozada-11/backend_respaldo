@@ -16,7 +16,12 @@ export class VehicleStatusRepository {
         status: { in: ['RECIBIDO', 'ASIGNADA', 'EN_REPARACION', 'ESPERANDO_REPUESTO', 'FINALIZADO', 'LISTO_ENTREGA'] },
       },
       orderBy: { createdAt: 'desc' },
-      include: { vehicle: true, customer: true },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        vehicle: { select: { plate: true, brand: true, model: true, year: true } },
+      },
     });
   }
 }
