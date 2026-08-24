@@ -26,9 +26,11 @@ async function bootstrap(): Promise<void> {
     .setTitle('Los Fratelli Workshop API')
     .setDescription('Backend API for the Los Fratelli mechanical workshop')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/v1/docs', app, document);
+  // Keep Swagger outside the versioned API prefix so it is available at /api.
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(process.env.PORT ?? 3000);
 }

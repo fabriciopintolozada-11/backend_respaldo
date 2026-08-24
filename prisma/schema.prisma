@@ -8,57 +8,68 @@ datasource db {
 }
 
 model Customer {
-  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identification String      @unique @db.VarChar(50)
-  name           String      @db.VarChar(150)
-  phone          String?     @db.VarChar(30)
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  identification String      @unique @db.VarChar(50) @map("identification")
+  name           String      @db.VarChar(150) @map("name")
+  phone          String?     @db.VarChar(30) @map("phone")
   vehicles       Vehicle[]
   workOrders     WorkOrder[]
+
+  @@map("customers")
 }
 
 model Vehicle {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId       String             @db.Uuid
-  plate            String             @unique @db.VarChar(10)
-  brand            String             @db.VarChar(80)
-  model            String             @db.VarChar(80)
-  year             Int                @db.SmallInt
-  isFullyElectric  Boolean            @default(false)
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  customerId       String             @db.Uuid @map("customer_id")
+  plate            String             @unique @db.VarChar(10) @map("license_plate")
+  brand            String             @db.VarChar(80) @map("brand")
+  model            String             @db.VarChar(80) @map("model")
+  year             Int                @db.SmallInt @map("year")
+  isFullyElectric  Boolean            @default(false) @map("is_fully_electric")
   customer         Customer           @relation(fields: [customerId], references: [id])
   workOrders       WorkOrder[]
   technicalHistory TechnicalHistory[]
+
+  @@index([plate])
+  @@map("vehicles")
 }
 
 model WorkOrder {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  vehicleId        String    @db.Uuid
-  customerId       String    @db.Uuid
-  receptionistId   String    @db.Uuid
-  initialComplaint String
-  status           String    @default("RECIBIDO") @db.VarChar(30)
-  mechanicId       String?   @db.Uuid
-  assignedAt       DateTime? @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  vehicleId        String    @db.Uuid @map("vehicle_id")
+  customerId       String    @db.Uuid @map("customer_id")
+  receptionistId   String    @db.Uuid @map("receptionist_id")
+  initialComplaint String @map("initial_complaint")
+  status           String    @default("RECIBIDO") @db.VarChar(30) @map("status")
+  mechanicId       String?   @db.Uuid @map("mechanic_id")
+  assignedAt       DateTime? @db.Timestamptz(6) @map("assigned_at")
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
   vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
   customer         Customer  @relation(fields: [customerId], references: [id])
   mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
 
+  @@index([vehicleId])
+  @@index([status])
   @@index([mechanicId])
+  @@map("work_orders")
 }
 
 model Mechanic {
-  id         String      @id @db.Uuid
-  isActive   Boolean     @default(true)
+  id         String      @id @db.Uuid @map("id")
+  isActive   Boolean     @default(true) @map("is_active")
   workOrders WorkOrder[]
+
+  @@map("mechanics")
 }
 
 model TechnicalHistory {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  vehicleId   String   @db.Uuid
-  description String
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  vehicleId   String   @db.Uuid @map("vehicle_id")
+  description String @map("description")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
 
   @@index([vehicleId, createdAt(sort: Desc)])
+  @@map("technical_histories")
 }
