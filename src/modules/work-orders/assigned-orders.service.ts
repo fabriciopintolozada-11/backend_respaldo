@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AssignedWorkOrderRow, MechanicOrdersRepository } from './repositories/mechanic-orders.repository';
+import {
+  AssignedWorkOrderDetailRow,
+  AssignedWorkOrderListRow,
+  MechanicOrdersRepository,
+} from './repositories/mechanic-orders.repository';
+import { AssignedWorkOrderDetailResponseDto } from './dto/assigned-work-order-detail.response.dto';
 import { ListAssignedWorkOrdersResponseDto } from './dto/list-assigned-work-orders.response.dto';
 import { QueryAssignedWorkOrdersDto } from './dto/query-assigned-work-orders.dto';
 
@@ -23,7 +28,7 @@ export class AssignedOrdersService {
     ]);
 
     return {
-      data: rows.map((row: AssignedWorkOrderRow) => ({
+      data: rows.map((row: AssignedWorkOrderListRow) => ({
         id: row.id,
         vehicleId: row.vehicleId,
         plate: row.vehicle.plate,
@@ -37,9 +42,20 @@ export class AssignedOrdersService {
     };
   }
 
-  async getAssignedDetail(mechanicId: string, workOrderId: string) {
+  async getAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailResponseDto> {
     const order = await this.repository.findAssignedDetail(mechanicId, workOrderId);
-    if (!order) throw new NotFoundException('Assigned work order not found');
-    return order;
+    if (!order) throw new NotFoundException('No se encontró una Orden de Trabajo asignada a este mecánico');
+    const detail: AssignedWorkOrderDetailRow = order;
+    return {
+      id: detail.id,
+      vehicleId: detail.vehicleId,
+      plate: detail.vehicle.plate,
+      brand: detail.vehicle.brand,
+      model: detail.vehicle.model,
+      year: detail.vehicle.year,
+      status: detail.status,
+      initialComplaint: detail.initialComplaint,
+      assignedAt: detail.assignedAt,
+    };
   }
 }
