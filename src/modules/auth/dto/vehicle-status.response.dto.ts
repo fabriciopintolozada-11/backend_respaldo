@@ -1,41 +1,35 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VehicleSummaryDto {
-  @ApiProperty({ description: 'Vehicle brand' })
+  @ApiProperty({ description: 'Marca del vehículo' })
   brand!: string;
 
-  @ApiProperty({ description: 'Vehicle model' })
+  @ApiProperty({ description: 'Modelo del vehículo' })
   model!: string;
 
-  @ApiProperty({ description: 'Vehicle year' })
+  @ApiProperty({ description: 'Año del vehículo' })
   year!: number;
 }
 
 export class VehicleStatusResponseDto {
-  @ApiProperty({ description: 'Work order id' })
+  @ApiProperty({ description: 'Identificador de la Orden de Trabajo' })
   workOrderId!: string;
 
-  @ApiProperty({ description: 'Vehicle license plate' })
+  @ApiProperty({ description: 'Placa del vehículo' })
   plate!: string;
 
-  @ApiProperty({ type: VehicleSummaryDto, description: 'Vehicle summary' })
+  @ApiProperty({ type: VehicleSummaryDto, description: 'Resumen del vehículo' })
   vehicle!: VehicleSummaryDto;
 
-  @ApiProperty({ description: 'Customer name' })
-  customerName!: string;
-
-  @ApiProperty({ description: 'Initial complaint reported by the customer' })
-  initialComplaint!: string;
-
-  @ApiProperty({ description: 'Work order creation date' })
+  @ApiProperty({ description: 'Fecha de creación de la Orden de Trabajo' })
   createdAt!: Date;
 
-  @ApiProperty({ description: 'Current work order status' })
+  @ApiProperty({ description: 'Estado actual de la Orden de Trabajo' })
   status!: string;
 
-  @ApiProperty({ description: 'Human readable stage of the attention' })
+  @ApiProperty({ description: 'Etapa legible de la atención' })
   stage!: string;
 
-  @ApiProperty({ description: 'Whether the vehicle is ready for pickup' })
+  @ApiProperty({ description: 'Indica si el vehículo está listo para ser retirado' })
   readyForPickup!: boolean;
 }

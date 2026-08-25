@@ -6,6 +6,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-vehicle-entry.dto';
+import { VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
+import { VehiclePlateParamDto } from './dto/vehicle-plate-param.dto';
 import { WorkOrdersService } from './work-orders.service';
 
 @ApiTags('work-orders')
@@ -16,15 +18,25 @@ export class WorkOrdersController {
   constructor(private readonly service: WorkOrdersService) {}
 
   @Get('vehicles/:plate/history')
-  @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
-  @ApiResponse({ status: 200 })
-  getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
+  @ApiOperation({ summary: 'Consultar el historial técnico del vehículo (US-01, RN-20)' })
+  @ApiResponse({ status: 200, description: 'Historial técnico del vehículo', type: VehicleHistoryResponseDto })
+  @ApiResponse({ status: 400, description: 'La placa tiene un formato inválido' })
+  @ApiResponse({ status: 401, description: 'Se requiere autenticación' })
+  @ApiResponse({ status: 403, description: 'El usuario no tiene rol de recepcionista' })
+  @ApiResponse({ status: 404, description: 'No se encontró el vehículo' })
+  getHistory(@Param() params: VehiclePlateParamDto): Promise<VehicleHistoryResponseDto> {
+    return this.service.getVehicleHistory(params.plate);
+  }
 
   @Post('work-orders')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register vehicle entry and create work order (US-01, RN-01, RN-18)' })
-  @ApiResponse({ status: 201, type: WorkOrderResponseDto })
-  @ApiResponse({ status: 422, description: 'Electric vehicles are not accepted' })
+  @ApiOperation({ summary: 'Registrar el ingreso del vehículo y crear la Orden de Trabajo (US-01, RN-01, RN-18)' })
+  @ApiResponse({ status: 201, description: 'Cliente, vehículo y Orden de Trabajo registrados correctamente', type: WorkOrderResponseDto })
+  @ApiResponse({ status: 400, description: 'Los datos de entrada son inválidos' })
+  @ApiResponse({ status: 401, description: 'Se requiere autenticación' })
+  @ApiResponse({ status: 403, description: 'El usuario no tiene rol de recepcionista' })
+  @ApiResponse({ status: 409, description: 'La placa ya se encuentra registrada a nombre de otro cliente' })
+  @ApiResponse({ status: 422, description: 'Los vehículos 100% eléctricos no son aceptados' })
   register(@Body() dto: RegisterVehicleEntryDto, @Req() request: Request): Promise<WorkOrderResponseDto> {
     return this.service.registerVehicleEntry(dto, request.user.id);
   }

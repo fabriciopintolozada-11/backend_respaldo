@@ -1,21 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
+
+export interface VehicleHistoryRecord {
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  technicalHistory: Array<{ description: string; createdAt: Date }>;
+  workOrders: Array<{ id: string; status: string; createdAt: Date; updatedAt: Date }>;
+}
 
 @Injectable()
 export class WorkOrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findVehicleHistory(plate: string) {
+  async findVehicleHistory(plate: string): Promise<VehicleHistoryRecord> {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { plate },
-      include: {
-        customer: true,
+      select: {
+        plate: true,
+        brand: true,
+        model: true,
+        year: true,
         technicalHistory: { orderBy: { createdAt: 'desc' } },
         workOrders: {
           orderBy: { createdAt: 'desc' },
-          include: { mechanic: true },
+          select: { id: true, status: true, createdAt: true, updatedAt: true },
         },
       },
     });
@@ -30,11 +42,30 @@ export class WorkOrderRepository {
         update: { name: dto.customer.name, phone: dto.customer.phone },
         create: { identification: dto.customer.identification, name: dto.customer.name, phone: dto.customer.phone },
       });
-      const vehicle = await transaction.vehicle.upsert({
-        where: { plate: dto.plate },
-        update: { brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year },
-        create: { customerId: customer.id, plate: dto.plate, brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year, isFullyElectric: dto.vehicle.isFullyElectric },
-      });
+      const existingVehicle = await transaction.vehicle.findUnique({ where: { plate: dto.plate } });
+      if (existingVehicle && existingVehicle.customerId !== customer.id) {
+        throw new ConflictException('La placa ya se encuentra registrada a nombre de otro cliente');
+      }
+
+      const vehicle = existingVehicle
+        ? await transaction.vehicle.update({
+            where: { id: existingVehicle.id },
+            data: { brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year },
+          })
+        : await transaction.vehicle.create({
+            data: {
+              customerId: customer.id,
+              plate: dto.plate,
+              brand: dto.vehicle.brand,
+              model: dto.vehicle.model,
+              year: dto.vehicle.year,
+              isFullyElectric: dto.vehicle.isFullyElectric,
+            },
+          });
+
+      if (vehicle.isFullyElectric) {
+        throw new UnprocessableEntityException('Los vehículos 100% eléctricos no son aceptados');
+      }
       const workOrder = await transaction.workOrder.create({
         data: { vehicleId: vehicle.id, customerId: customer.id, receptionistId, initialComplaint: dto.initialComplaint },
         select: { id: true, vehicleId: true, customerId: true, status: true, initialComplaint: true, createdAt: true },

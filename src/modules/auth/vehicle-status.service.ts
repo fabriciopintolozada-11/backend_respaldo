@@ -37,8 +37,6 @@ export class VehicleStatusService {
         model: order.vehicle.model,
         year: order.vehicle.year,
       },
-      customerName: order.customer.name,
-      initialComplaint: order.initialComplaint,
       createdAt: order.createdAt,
       status,
       stage: this.getWorkOrderStage(status),
