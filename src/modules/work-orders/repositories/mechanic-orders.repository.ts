@@ -1,13 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
-export interface AssignedWorkOrderRow {
+export interface AssignedWorkOrderListRow {
   id: string;
   vehicleId: string;
   status: string;
   initialComplaint: string;
   assignedAt: Date | null;
   vehicle: { plate: string };
+}
+
+export interface AssignedWorkOrderDetailRow {
+  id: string;
+  vehicleId: string;
+  status: string;
+  initialComplaint: string;
+  assignedAt: Date | null;
+  vehicle: { plate: string; brand: string; model: string; year: number };
 }
 
 // BE-08: PrismaService is only injected inside repositories. BE-09: semantic
@@ -17,7 +26,7 @@ export interface AssignedWorkOrderRow {
 export class MechanicOrdersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAssignedToMechanic(mechanicId: string, page: number, pageSize: number): Promise<AssignedWorkOrderRow[]> {
+  findAssignedToMechanic(mechanicId: string, page: number, pageSize: number): Promise<AssignedWorkOrderListRow[]> {
     return this.prisma.workOrder.findMany({
       where: { mechanicId },
       orderBy: { assignedAt: 'desc' },
@@ -34,7 +43,9 @@ export class MechanicOrdersRepository {
     });
   }
 
-  findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderRow | null> {
+  // RN-04: the mechanic id is part of the where clause, so a mechanic can
+  // never read a work order assigned to another mechanic.
+  findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailRow | null> {
     return this.prisma.workOrder.findFirst({
       where: { id: workOrderId, mechanicId },
       select: {
@@ -45,7 +56,7 @@ export class MechanicOrdersRepository {
         assignedAt: true,
         vehicle: { select: { plate: true, brand: true, model: true, year: true } },
       },
-    }) as Promise<AssignedWorkOrderRow | null>;
+    });
   }
 
   countAssignedToMechanic(mechanicId: string) {
