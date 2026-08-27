@@ -80,20 +80,34 @@ export class WorkOrderRepository {
     });
   }
 
-  assign(id: string, mechanicId: string): Promise<AssignWorkOrderResponseDto> {
-    return this.prisma.$transaction(async (transaction) => {
-      const order = await transaction.workOrder.findUnique({ where: { id } });
-      if (!order) throw new NotFoundException('Work order not found');
-      if (order.mechanicId || order.status !== 'RECIBIDO') throw new Error('Work order is not assignable');
-      const mechanic = await transaction.mechanic.findUnique({ where: { id: mechanicId } });
-      if (!mechanic) throw new NotFoundException('Mechanic not found');
-      if (!mechanic.isActive) throw new Error('Mechanic cannot receive work orders');
-      const assignedOrder = await transaction.workOrder.update({
-        where: { id },
-        data: { mechanicId, assignedAt: new Date(), status: 'ASIGNADA' },
-        select: { id: true, mechanicId: true, status: true, updatedAt: true },
-      });
-      return { ...assignedOrder, mechanicId: assignedOrder.mechanicId as string };
+  findWorkOrderForAssignment(db: Pick<PrismaService, 'workOrder'>, id: string) {
+    return db.workOrder.findUnique({
+      where: { id },
+      select: { mechanicId: true, status: true },
     });
+  }
+
+  findMechanicForAssignment(db: Pick<PrismaService, 'mechanic'>, mechanicId: string) {
+    return db.mechanic.findUnique({
+      where: { id: mechanicId },
+      select: { isActive: true },
+    });
+  }
+
+  async assignWorkOrder(
+    db: Pick<PrismaService, 'workOrder'>,
+    id: string,
+    mechanicId: string,
+  ): Promise<AssignWorkOrderResponseDto | null> {
+    const result = await db.workOrder.updateMany({
+      where: { id, mechanicId: null, status: 'RECIBIDO' },
+      data: { mechanicId, assignedAt: new Date(), status: 'ASIGNADA' },
+    });
+    if (result.count === 0) return null;
+
+    return db.workOrder.findUnique({
+      where: { id },
+      select: { id: true, mechanicId: true, status: true, updatedAt: true },
+    }) as Promise<AssignWorkOrderResponseDto>;
   }
 }
