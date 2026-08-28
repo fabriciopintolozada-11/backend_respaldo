@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: pdis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pdis}
+      POSTGRES_USER: ${POSTGRES_USER:-pdis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pdis_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pdis-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pdis} -d ${POSTGRES_DB:-pdis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pdis-postgres-data:

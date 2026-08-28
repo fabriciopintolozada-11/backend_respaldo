@@ -1,0 +1,53 @@
+{
+  "name": "taller-front",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Los Fratelli - Taller Mecánico · Frontend (React + Vite + TypeScript)",
+  "scripts": {
+    "dev": "vite",
+    "dev:web": "vite",
+    "mock": "node mock-server/server.cjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:schema": "openapi-typescript http://localhost:3000/api/docs-json -o src/shared/api/schema.gen.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.101.4",
+    "axios": "^1.19.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.33.0",
+    "motion": "^13.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.85.0",
+    "react-router": "^7.18.2",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^10.0.5",
+    "jsdom": "^26.1.0",
+    "json-server": "^0.17.4",
+    "msw": "^2.15.0",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.11"
+  }
+}
