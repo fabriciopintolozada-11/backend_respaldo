@@ -1,0 +1,356 @@
+@import 'tailwindcss';
+
+@layer base {
+  body {
+    font-family:
+      'Plus Jakarta Sans',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
+    background-color: #0f1115;
+    color: #e0e2e6;
+    margin: 0;
+    min-height: 100vh;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f1115;
+}
+::-webkit-scrollbar-thumb {
+  background: #2d3139;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4149;
+}
+
+/* ============ Portal Cliente (Tracking Público) ============ */
+.tracking-public {
+  min-height: 100vh;
+  padding: 56px 24px 80px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f6f7fb 0%, #eef1f6 100%);
+  color: #1a1d23;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.tracking-header {
+  max-width: 640px;
+  text-align: center;
+}
+
+.tracking-header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: #101318;
+  letter-spacing: -0.02em;
+}
+
+.tracking-header p {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+  color: #4b5563;
+}
+
+.tracking-public form {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border: 1px solid #e3e7ee;
+  border-radius: 16px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 4px 24px rgba(16, 19, 24, 0.06);
+}
+
+.tracking-public form div {
+  display: grid;
+  gap: 6px;
+}
+
+.tracking-public form label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.tracking-public form input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #101318;
+  background: #fafbfc;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.tracking-public form input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+}
+
+.tracking-public form input[disabled] {
+  opacity: 0.6;
+}
+
+.tracking-public form button {
+  height: 46px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.tracking-public form button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+}
+
+.tracking-public form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tracking-public form p[role='alert'] {
+  margin: 0;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.notice-card {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border: 1px dashed #d5dae3;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.notice-card h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+  color: #101318;
+}
+
+.notice-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  color: #4b5563;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #374151;
+  font-size: 15px;
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid #e5e7eb;
+  border-top-color: #f97316;
+  animation: tracking-spin 0.8s linear infinite;
+}
+
+@keyframes tracking-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-banner {
+  width: 100%;
+  max-width: 640px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 16px;
+  padding: 20px 24px;
+  color: #991b1b;
+}
+
+.error-banner h2 {
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.error-banner p {
+  font-size: 14px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.error-banner button {
+  border: 1px solid #fca5a5;
+  background: #ffffff;
+  color: #991b1b;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ready-banner {
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 14px;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+
+.vehicle-status-card {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border: 1px solid #e3e7ee;
+  border-radius: 16px;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+  box-shadow: 0 4px 24px rgba(16, 19, 24, 0.06);
+}
+
+.vehicle-status-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vehicle-status-card header h2 {
+  font-size: 18px;
+  margin: 0;
+  color: #101318;
+}
+
+.vehicle-status-card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+}
+
+.vehicle-status-card dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.vehicle-status-card dt {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.vehicle-status-card dd {
+  margin: 0;
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.vehicle-status-card section h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px;
+  color: #6b7280;
+}
+
+.vehicle-status-card section p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f97316;
+}
+
+.stage-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a3412;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  white-space: nowrap;
+}
+
+.status-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.status-timeline li {
+  flex: 1 1 0;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.status-timeline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #d1d5db;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #d1d5db;
+}
+
+.status-timeline-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.status-timeline li.reached .status-timeline-dot {
+  background: #f97316;
+  box-shadow: 0 0 0 1px #f97316;
+}
+
+.status-timeline li.reached .status-timeline-label {
+  color: #111827;
+  font-weight: 600;
+}

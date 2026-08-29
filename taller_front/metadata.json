@@ -1,0 +1,6 @@
+{
+  "name": "Taller Mecánico Los Fratelli",
+  "description": "Sistema de gestión integral para Taller Mecánico Los Fratelli: control de 4 bahías, recepción, mecánicos, órdenes de trabajo, inventario, cotizaciones, liquidaciones en BOB y consulta pública para clientes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
