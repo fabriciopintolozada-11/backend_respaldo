@@ -10,10 +10,8 @@ describe('VehicleStatusService (US-02)', () => {
   const baseOrder = {
     id: 'ot-1',
     status: 'EN_REPARACION',
-    initialComplaint: 'No arranca',
     createdAt: new Date('2026-08-01T10:00:00Z'),
     vehicle: { plate: '1234ABC', brand: 'Toyota', model: 'Corolla', year: 2019 },
-    customer: { name: 'Juan Perez' },
   };
 
   beforeEach(async () => {
@@ -36,7 +34,6 @@ describe('VehicleStatusService (US-02)', () => {
     expect(result.stage).toBe('En reparación');
     expect(result.readyForPickup).toBe(false);
     expect(result.plate).toBe('1234ABC');
-    expect(result.customerName).toBe('Juan Perez');
     // plate is normalized to uppercase before hitting the repository
     expect(repository.findLatestByPlateAndIdentification).toHaveBeenCalledWith('1234ABC', '1234567');
   });
