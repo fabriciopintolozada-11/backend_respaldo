@@ -2,10 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
+import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
+import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
 
 @Injectable()
 export class WorkOrderRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  findAssignedWorkOrder(id: string, mechanicId: string) {
+    return this.prisma.workOrder.findFirst({ where: { id, mechanicId }, select: { status: true } });
+  }
 
   async findVehicleHistory(plate: string) {
     const vehicle = await this.prisma.vehicle.findUnique({
@@ -63,6 +69,29 @@ export class WorkOrderRepository {
         select: { id: true, mechanicId: true, status: true, updatedAt: true },
       });
       return { ...assignedOrder, mechanicId: assignedOrder.mechanicId as string };
+    });
+  }
+
+  createDiagnostic(id: string, dto: CreateDiagnosticDto, status: string): Promise<DiagnosticResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const diagnostic = await transaction.diagnostic.upsert({
+        where: { workOrderId: id },
+        update: { description: dto.description, suggestedTasks: dto.suggestedTasks, suggestedPartIds: dto.suggestedPartIds, estimatedHours: dto.estimatedHours },
+        create: { workOrderId: id, description: dto.description, suggestedTasks: dto.suggestedTasks, suggestedPartIds: dto.suggestedPartIds, estimatedHours: dto.estimatedHours },
+      });
+      const order = await transaction.workOrder.update({ where: { id }, data: { status }, select: { vehicleId: true } });
+      await transaction.technicalHistory.create({ data: { vehicleId: order.vehicleId, description: `Diagnostic recorded for work order ${id}: ${dto.description}` } });
+      // RN-16: return an explicit allowlist. Never serialize the Prisma entity
+      // into a mechanic-facing response, so future financial fields cannot leak.
+      return {
+        id: diagnostic.id,
+        workOrderId: diagnostic.workOrderId,
+        description: diagnostic.description,
+        suggestedTasks: diagnostic.suggestedTasks as string[],
+        suggestedPartIds: diagnostic.suggestedPartIds as string[],
+        estimatedHours: Number(diagnostic.estimatedHours),
+        createdAt: diagnostic.createdAt,
+      };
     });
   }
 }

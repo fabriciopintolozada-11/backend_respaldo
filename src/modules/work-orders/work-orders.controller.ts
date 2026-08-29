@@ -7,6 +7,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-vehicle-entry.dto';
 import { WorkOrdersService } from './work-orders.service';
+import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
+import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -27,5 +29,13 @@ export class WorkOrdersController {
   @ApiResponse({ status: 422, description: 'Electric vehicles are not accepted' })
   register(@Body() dto: RegisterVehicleEntryDto, @Req() request: Request): Promise<WorkOrderResponseDto> {
     return this.service.registerVehicleEntry(dto, request.user.id);
+  }
+
+  @Post('work-orders/:id/diagnostic')
+  @Roles(UserRole.MECHANIC)
+  @ApiOperation({ summary: 'Register technical diagnosis (US-11, RN-04, RN-16, RN-19)' })
+  @ApiResponse({ status: 201, type: DiagnosticResponseDto })
+  createDiagnostic(@Param('id') id: string, @Body() dto: CreateDiagnosticDto, @Req() request: Request): Promise<DiagnosticResponseDto> {
+    return this.service.createDiagnostic(id, request.user.id, dto);
   }
 }

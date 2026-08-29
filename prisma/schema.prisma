@@ -62,11 +62,66 @@ model WorkOrder {
   vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
   customer         Customer  @relation(fields: [customerId], references: [id])
   mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
+  diagnostic       Diagnostic?
+  quote            Quote?
 
   @@index([vehicleId])
   @@index([status])
   @@index([mechanicId])
   @@map("work_orders")
+}
+
+model SparePart {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  code           String   @unique @db.VarChar(50) @map("code")
+  name           String   @db.VarChar(150) @map("name")
+  unitPrice      Decimal  @db.Decimal(12, 2) @map("unit_price")
+  isActive       Boolean  @default(true) @map("is_active")
+  quoteItems     QuotePart[]
+
+  @@map("spare_parts")
+}
+
+model Quote {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  workOrderId    String      @unique @db.Uuid @map("work_order_id")
+  laborItems     Json        @map("labor_items")
+  laborSubtotal  Decimal     @db.Decimal(12, 2) @map("labor_subtotal")
+  partsSubtotal  Decimal     @db.Decimal(12, 2) @map("parts_subtotal")
+  total          Decimal     @db.Decimal(12, 2) @map("total")
+  currency       String      @default("BOB") @db.Char(3) @map("currency")
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder      WorkOrder   @relation(fields: [workOrderId], references: [id])
+  parts          QuotePart[]
+
+  @@map("quotes")
+}
+
+model QuotePart {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  quoteId     String    @db.Uuid @map("quote_id")
+  sparePartId String    @db.Uuid @map("spare_part_id")
+  quantity    Int       @db.SmallInt
+  unitPrice   Decimal   @db.Decimal(12, 2) @map("unit_price")
+  subtotal    Decimal   @db.Decimal(12, 2) @map("subtotal")
+  quote       Quote     @relation(fields: [quoteId], references: [id])
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id])
+
+  @@unique([quoteId, sparePartId])
+  @@map("quote_parts")
+}
+
+model Diagnostic {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  workOrderId      String   @unique @db.Uuid @map("work_order_id")
+  description      String   @map("description")
+  suggestedTasks   Json     @map("suggested_tasks")
+  suggestedPartIds Json     @map("suggested_part_ids")
+  estimatedHours   Decimal  @db.Decimal(8, 2) @map("estimated_hours")
+  createdAt        DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@map("diagnostics")
 }
 
 model Mechanic {
