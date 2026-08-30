@@ -10,10 +10,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { QuotesModule } from './modules/quotes/quotes.module';
 import Joi from 'joi';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), DatabaseModule, PrismaModule, HealthRoutesModule, WorkOrdersModule, AssignedOrdersModule, AuthModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), DatabaseModule, PrismaModule, HealthRoutesModule, WorkOrdersModule, AssignedOrdersModule, AuthModule, QuotesModule],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule implements NestModule {
