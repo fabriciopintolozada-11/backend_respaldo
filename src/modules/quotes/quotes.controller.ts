@@ -16,7 +16,9 @@ export class QuotesController {
   constructor(private readonly service: QuotesService) {}
 
   @Post(':id/quote')
-  @ApiOperation({ summary: 'Generate a workshop quote in BOB (US-12, RN-21)' })
+  @ApiOperation({ summary: 'Create a workshop quote in BOB (US-12, RN-21)' })
   @ApiResponse({ status: 201, type: QuoteResponseDto })
-  create(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateQuoteDto): Promise<QuoteResponseDto> { return this.service.create(id, dto); }
+  create(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateQuoteDto): Promise<QuoteResponseDto> {
+    return this.service.create(id, dto);
+  }
 }

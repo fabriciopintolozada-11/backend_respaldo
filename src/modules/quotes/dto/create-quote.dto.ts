@@ -1,18 +1,38 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNumber, IsString, IsUUID, Length, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsString, Length, Min, ValidateNested } from 'class-validator';
 
-export class QuoteLaborItemDto {
-  @ApiProperty() @IsString() @Length(3, 255) description!: string;
-  @ApiProperty() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) hours!: number;
+export enum QuoteItemType {
+  LABOR = 'LABOR',
+  PART = 'PART',
 }
 
-export class QuotePartItemDto {
-  @ApiProperty() @IsUUID('4') sparePartId!: string;
-  @ApiProperty() @IsNumber() @Min(1) quantity!: number;
+export class CreateQuoteItemDto {
+  @ApiProperty({ minLength: 3, maxLength: 255 })
+  @IsString()
+  @Length(3, 255)
+  description!: string;
+
+  @ApiProperty({ enum: QuoteItemType })
+  @IsEnum(QuoteItemType)
+  itemType!: QuoteItemType;
+
+  @ApiProperty({ minimum: 0.01 })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  quantity!: number;
+
+  @ApiProperty({ minimum: 0 })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitPrice!: number;
 }
 
 export class CreateQuoteDto {
-  @ApiProperty({ type: [QuoteLaborItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => QuoteLaborItemDto) laborItems!: QuoteLaborItemDto[];
-  @ApiProperty({ type: [QuotePartItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => QuotePartItemDto) partItems!: QuotePartItemDto[];
+  @ApiProperty({ type: [CreateQuoteItemDto], minItems: 1 })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuoteItemDto)
+  items!: CreateQuoteItemDto[];
 }
