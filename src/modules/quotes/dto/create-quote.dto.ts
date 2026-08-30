@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsString, Length, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Length, Min, ValidateNested } from 'class-validator';
 
 export enum QuoteItemType {
   LABOR = 'LABOR',
@@ -16,6 +16,11 @@ export class CreateQuoteItemDto {
   @ApiProperty({ enum: QuoteItemType })
   @IsEnum(QuoteItemType)
   itemType!: QuoteItemType;
+
+  @ApiProperty({ required: false, format: 'uuid', description: 'Required for PART items' })
+  @IsOptional()
+  @IsUUID()
+  sparePartId?: string;
 
   @ApiProperty({ minimum: 0.01 })
   @IsNumber({ maxDecimalPlaces: 2 })

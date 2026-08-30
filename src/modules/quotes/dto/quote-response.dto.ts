@@ -15,6 +15,8 @@ export class QuoteResponseDto {
   @ApiProperty() workOrderId!: string;
   @ApiProperty({ type: [QuoteDetailResponseDto] }) items!: QuoteDetailResponseDto[];
   @ApiProperty() total!: string;
+  @ApiProperty() laborSubtotal!: string;
+  @ApiProperty() partsSubtotal!: string;
   @ApiProperty({ example: 'BOB' }) currency!: string;
   @ApiProperty() createdAt!: Date;
 }
