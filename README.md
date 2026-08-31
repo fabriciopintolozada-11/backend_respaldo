@@ -18,9 +18,6 @@ docker compose up -d
 
 La base queda disponible en el puerto `5454` del host:
 
-```env
-DATABASE_URL=postgresql://pdis:pdis_dev_password@localhost:5454/pdis
-```
 
 ## Desarrollo
 
