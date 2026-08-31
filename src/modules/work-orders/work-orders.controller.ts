@@ -13,16 +13,17 @@ import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
 @ApiTags('work-orders')
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.RECEPTIONIST)
 export class WorkOrdersController {
   constructor(private readonly service: WorkOrdersService) {}
 
   @Get('vehicles/:plate/history')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
   @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
   @ApiResponse({ status: 200 })
   getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
 
   @Post('work-orders')
+  @Roles(UserRole.RECEPTIONIST)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register vehicle entry and create work order (US-01, RN-01, RN-18)' })
   @ApiResponse({ status: 201, type: WorkOrderResponseDto })

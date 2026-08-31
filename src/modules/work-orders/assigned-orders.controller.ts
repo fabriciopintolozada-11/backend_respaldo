@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -34,7 +34,7 @@ export class AssignedOrdersController {
   @ApiOperation({ summary: 'Get an assigned work order technical detail (US-03)' })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 404, description: 'The work order is not assigned to this mechanic' })
-  getAssignedDetail(@Req() request: Request, @Param('id') id: string) {
+  getAssignedDetail(@Req() request: Request, @Param('id', ParseUUIDPipe) id: string) {
     return this.service.getAssignedDetail(request.user.id, id);
   }
 }

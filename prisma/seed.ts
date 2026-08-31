@@ -67,6 +67,8 @@ async function main() {
   // UUID v4 values are required by the assignment DTO validation.
   const mechanicA = '11111111-1111-4111-8111-111111111111';
   const mechanicB = '22222222-2222-4222-8222-222222222222';
+  // BE-19: the receptionist who registers the entry is the seeded recep01 user.
+  const receptionistId = '00000000-0000-4000-8000-000000000010';
 
   await prisma.mechanic.createMany({
     data: [{ id: mechanicA }, { id: mechanicB }],
@@ -78,7 +80,7 @@ async function main() {
         data: {
           vehicleId: vehicle.id,
           customerId: customers[index].id,
-          receptionistId: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
+          receptionistId,
           initialComplaint: `Revisión general de ejemplo ${index + 1}`,
           status: index % 3 === 2 ? 'RECIBIDO' : 'ASIGNADA',
           mechanicId: index % 3 === 0 ? mechanicA : index % 3 === 1 ? mechanicB : null,
