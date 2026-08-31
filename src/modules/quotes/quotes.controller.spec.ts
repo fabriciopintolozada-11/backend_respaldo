@@ -11,4 +11,9 @@ describe('QuotesController', () => {
       UserRole.ADMIN,
     ]);
   });
+
+  it('restricts quote decisions to receptionist and admin roles', () => {
+    const roles = new Reflector().get(ROLES_KEY, QuotesController.prototype.approve);
+    expect(roles).toEqual([UserRole.RECEPTIONIST, UserRole.ADMIN]);
+  });
 });

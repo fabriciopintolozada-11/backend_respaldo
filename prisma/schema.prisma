@@ -64,6 +64,7 @@ model WorkOrder {
   mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
   diagnostic       Diagnostic?
   quote            Quote?
+  notifications    Notification[]
 
   @@index([vehicleId])
   @@index([status])
@@ -76,6 +77,9 @@ model SparePart {
   code           String   @unique @db.VarChar(50) @map("code")
   name           String   @db.VarChar(150) @map("name")
   unitPrice      Decimal  @db.Decimal(12, 2) @map("unit_price")
+  physicalStock  Int      @default(0) @map("physical_stock")
+  availableStock Int      @default(0) @map("available_stock")
+  reservedStock  Int      @default(0) @map("reserved_stock")
   isActive       Boolean  @default(true) @map("is_active")
   quoteItems     QuotePart[]
 
@@ -94,6 +98,7 @@ model Quote {
   workOrder      WorkOrder   @relation(fields: [workOrderId], references: [id])
   parts          QuotePart[]
   details        QuoteDetail[]
+  approvals      QuoteApproval[]
 
   @@map("quotes")
 }
@@ -105,11 +110,42 @@ model QuotePart {
   quantity    Int       @db.SmallInt
   unitPrice   Decimal   @db.Decimal(12, 2) @map("unit_price")
   subtotal    Decimal   @db.Decimal(12, 2) @map("subtotal")
+  status      String    @default("PROPOSED") @db.VarChar(20) @map("status")
   quote       Quote     @relation(fields: [quoteId], references: [id])
   sparePart   SparePart @relation(fields: [sparePartId], references: [id])
 
   @@unique([quoteId, sparePartId])
   @@map("quote_parts")
+}
+
+model QuoteApproval {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quoteId      String   @db.Uuid @map("quote_id")
+  decision     String   @db.VarChar(20) @map("decision")
+  channel      String?  @db.VarChar(20) @map("channel")
+  customerName String?  @db.VarChar(150) @map("customer_name")
+  notes        String?  @db.Text @map("notes")
+  reason       String?  @db.Text @map("reason")
+  recordedBy   String   @db.Uuid @map("recorded_by")
+  createdAt    DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  quote        Quote    @relation(fields: [quoteId], references: [id])
+
+  @@index([quoteId, createdAt(sort: Desc)])
+  @@map("quote_approvals")
+}
+
+model Notification {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId  String    @db.Uuid @map("recipient_id")
+  workOrderId  String    @db.Uuid @map("work_order_id")
+  type         String    @db.VarChar(40)
+  message      String    @db.Text
+  readAt       DateTime? @db.Timestamptz(6) @map("read_at")
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder    WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@map("notifications")
 }
 
 model QuoteDetail {
