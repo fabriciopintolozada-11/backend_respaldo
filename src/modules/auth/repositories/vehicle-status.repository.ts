@@ -12,8 +12,9 @@ export class VehicleStatusRepository {
       where: {
         vehicle: { plate },
         customer: { identification },
-        // HU-02: only operational work orders are visible through the public query.
-        status: { in: ['RECIBIDO', 'ASIGNADA', 'EN_REPARACION', 'ESPERANDO_REPUESTO', 'FINALIZADO', 'LISTO_ENTREGA'] },
+        // HU-02 / RN-17: any operational work order is visible through the public
+        // query. Only rejected and delivered (closed) orders are excluded.
+        status: { notIn: ['RECHAZADO', 'ENTREGADO'] },
       },
       orderBy: { createdAt: 'desc' },
       select: {
