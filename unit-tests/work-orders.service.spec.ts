@@ -1,8 +1,8 @@
 import { UnprocessableEntityException } from '@nestjs/common';
-import { RegisterVehicleEntryDto } from '../dto/register-vehicle-entry.dto';
-import { WorkOrderRepository } from '../repositories/work-order.repository';
-import { WorkOrdersService } from '../work-orders.service';
-import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
+import { RegisterVehicleEntryDto } from '../src/modules/work-orders/dto/register-vehicle-entry.dto';
+import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
+import { WorkOrdersService } from '../src/modules/work-orders/work-orders.service';
+import { CreateDiagnosticDto } from '../src/modules/work-orders/dto/create-diagnostic.dto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
@@ -27,30 +27,73 @@ describe('WorkOrdersService (HU-01)', () => {
     service = new WorkOrdersService(repository);
   });
 
-  it('rejects fully electric vehicles with HTTP 422 (RN-18)', () => {
-    const electricDto = { ...dto, vehicle: { ...dto.vehicle, isFullyElectric: true } };
+  describe('HU-01 Escenario 1: Registro exitoso de nuevo vehículo', () => {
+    it("creates a work order in 'RECIBIDO' state with normalized plate", async () => {
+      repository.createVehicleEntry = jest.fn().mockResolvedValue({
+        id: 'work-order-id',
+        vehicleId: 'vehicle-id',
+        customerId: 'customer-id',
+        status: 'RECIBIDO',
+        initialComplaint: dto.initialComplaint,
+        createdAt: new Date(),
+      });
 
-    expect(() => service.registerVehicleEntry(electricDto, 'receptionist-id')).toThrow(UnprocessableEntityException);
-    expect(repository.createVehicleEntry).not.toHaveBeenCalled();
+      const result = await service.registerVehicleEntry(dto, 'receptionist-id');
+
+      expect(result.status).toBe('RECIBIDO');
+      expect(repository.createVehicleEntry).toHaveBeenCalledWith(
+        { ...dto, plate: 'ABC-123' },
+        'receptionist-id',
+      );
+    });
   });
 
-  it("creates a work order in 'RECIBIDO' state", async () => {
-    repository.createVehicleEntry = jest.fn().mockResolvedValue({
-      id: 'work-order-id',
-      vehicleId: 'vehicle-id',
-      customerId: 'customer-id',
-      status: 'RECIBIDO',
-      initialComplaint: dto.initialComplaint,
-      createdAt: new Date(),
+  describe('HU-01 Escenario 2: Reutilización de vehículo existente', () => {
+    it('passes normalized plate to repository for upsert logic', async () => {
+      repository.createVehicleEntry = jest.fn().mockResolvedValue({
+        id: 'work-order-new',
+        vehicleId: 'existing-vehicle-id',
+        customerId: 'original-customer-id',
+        status: 'RECIBIDO',
+        initialComplaint: dto.initialComplaint,
+        createdAt: new Date(),
+      });
+
+      const result = await service.registerVehicleEntry(
+        { ...dto, plate: '  abc-123  ' },
+        'receptionist-id',
+      );
+
+      expect(result.status).toBe('RECIBIDO');
+      expect(repository.createVehicleEntry).toHaveBeenCalledWith(
+        { ...dto, plate: 'ABC-123' },
+        'receptionist-id',
+      );
     });
+  });
 
-    const result = await service.registerVehicleEntry(dto, 'receptionist-id');
+  describe('HU-01 Escenario 3: Bloqueo de recepción para vehículos eléctricos (RN-18)', () => {
+    it('rejects fully electric vehicles with HTTP 422', () => {
+      const electricDto = { ...dto, vehicle: { ...dto.vehicle, isFullyElectric: true } };
 
-    expect(result.status).toBe('RECIBIDO');
-    expect(repository.createVehicleEntry).toHaveBeenCalledWith(
-      { ...dto, plate: 'ABC-123' },
-      'receptionist-id',
-    );
+      expect(() => service.registerVehicleEntry(electricDto, 'receptionist-id')).toThrow(UnprocessableEntityException);
+      expect(repository.createVehicleEntry).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
+  const repository = {
+    createVehicleEntry: jest.fn(),
+    findVehicleHistory: jest.fn(),
+    findAssignedWorkOrder: jest.fn(),
+    createDiagnostic: jest.fn(),
+  } as unknown as WorkOrderRepository;
+  let service: WorkOrdersService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new WorkOrdersService(repository);
   });
 
   it('records a diagnosis for the assigned mechanic and moves the order to diagnosis', async () => {
