@@ -8,9 +8,9 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
-import { AuthService } from './auth.service';
-import { UserRepository } from './repositories/user.repository';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { AuthService } from '../src/modules/auth/auth.service';
+import { UserRepository } from '../src/modules/auth/repositories/user.repository';
+import { UserRole } from '../src/common/enums/user-role.enum';
 
 describe('AuthService (US-00)', () => {
   let service: AuthService;
