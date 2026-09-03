@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -9,12 +9,31 @@ import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-ve
 import { WorkOrdersService } from './work-orders.service';
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
+import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
+import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class WorkOrdersController {
   constructor(private readonly service: WorkOrdersService) {}
+
+  @Get('work-orders')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List work orders available for mechanic assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListWorkOrdersResponseDto })
+  getAvailable(@Query() query: QueryWorkOrdersDto): Promise<ListWorkOrdersResponseDto> {
+    return this.service.getAvailableWorkOrders(query);
+  }
+
+  @Get('mechanics')
+  @Roles(UserRole.WORKSHOP_LEAD)
+  @ApiOperation({ summary: 'List active mechanics for work order assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListMechanicsResponseDto })
+  getActiveMechanics(@Query() query: QueryWorkOrdersDto): Promise<ListMechanicsResponseDto> {
+    return this.service.getActiveMechanics(query);
+  }
 
   @Get('vehicles/:plate/history')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)

@@ -5,12 +5,89 @@ import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
 
+export interface AvailableWorkOrderRow {
+  id: string;
+  vehicleId: string;
+  plate: string;
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: number;
+  customerName: string;
+  customerIdentification: string;
+  initialComplaint: string;
+  status: string;
+  createdAt: Date;
+  mechanicId: string | null;
+}
+
+export interface ActiveMechanicRow {
+  id: string;
+  isActive: boolean;
+}
+
 @Injectable()
 export class WorkOrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findAssignedWorkOrder(id: string, mechanicId: string) {
     return this.prisma.workOrder.findFirst({ where: { id, mechanicId }, select: { status: true } });
+  }
+
+  findAvailable(page: number, pageSize: number): Promise<AvailableWorkOrderRow[]> {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'RECIBIDO', mechanicId: null },
+      orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        vehicleId: true,
+        status: true,
+        initialComplaint: true,
+        createdAt: true,
+        mechanicId: true,
+        vehicle: {
+          select: {
+            plate: true,
+            brand: true,
+            model: true,
+            year: true,
+            customer: { select: { name: true, identification: true } },
+          },
+        },
+      },
+    }).then((rows) => rows.map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicleId,
+      plate: row.vehicle.plate,
+      vehicleBrand: row.vehicle.brand,
+      vehicleModel: row.vehicle.model,
+      vehicleYear: row.vehicle.year,
+      customerName: row.vehicle.customer.name,
+      customerIdentification: row.vehicle.customer.identification,
+      initialComplaint: row.initialComplaint,
+      status: row.status,
+      createdAt: row.createdAt,
+      mechanicId: row.mechanicId,
+    })));
+  }
+
+  countAvailable(): Promise<number> {
+    return this.prisma.workOrder.count({ where: { status: 'RECIBIDO', mechanicId: null } });
+  }
+
+  findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
+    return this.prisma.mechanic.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: { id: true, isActive: true },
+    });
+  }
+
+  countActiveMechanics(): Promise<number> {
+    return this.prisma.mechanic.count({ where: { isActive: true } });
   }
 
   async findVehicleHistory(plate: string) {
