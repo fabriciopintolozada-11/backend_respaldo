@@ -1,14 +1,10 @@
-CREATE TABLE "quotes" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "work_order_id" UUID NOT NULL,
-    "total" DECIMAL(12,2) NOT NULL,
-    "currency" CHAR(3) NOT NULL DEFAULT 'BOB',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "quotes_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "quotes_work_order_id_key" UNIQUE ("work_order_id"),
-    CONSTRAINT "quotes_work_order_id_fkey" FOREIGN KEY ("work_order_id") REFERENCES "WorkOrder"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
+-- Make legacy quote columns nullable (the schema evolved from HU-12).
+ALTER TABLE "quotes"
+    ALTER COLUMN "labor_items" DROP NOT NULL,
+    ALTER COLUMN "labor_subtotal" DROP NOT NULL,
+    ALTER COLUMN "parts_subtotal" DROP NOT NULL;
 
+-- Create the detail lines table for simplified quotes.
 CREATE TABLE "quote_details" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "quote_id" UUID NOT NULL,
