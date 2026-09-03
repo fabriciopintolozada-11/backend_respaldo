@@ -16,5 +16,5 @@ export class QueryVehicleStatusDto {
   })
   @IsString()
   @IsNotEmpty()
-  customerIdentification!: string;
+  identification!: string;
 }
