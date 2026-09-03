@@ -8,7 +8,8 @@ describe('QuotesService quote decisions', () => {
       findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'PRESUPUESTO_ENVIADO' } }),
       approve: jest.fn().mockResolvedValue({ decision: 'APPROVED' }),
     };
-    const service = new QuotesService(repository as never);
+    const configService = { get: jest.fn(() => '65') };
+    const service = new QuotesService(repository as never, configService as never);
 
     await service.approve('order-1', { channel: ApprovalChannel.WHATSAPP, customerName: 'Cliente', notes: 'Autorizado' }, 'user-1');
 
@@ -20,7 +21,8 @@ describe('QuotesService quote decisions', () => {
       findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'APROBADO' } }),
       reject: jest.fn(),
     };
-    const service = new QuotesService(repository as never);
+    const configService = { get: jest.fn(() => '65') };
+    const service = new QuotesService(repository as never, configService as never);
 
     await expect(service.reject('order-1', { reason: 'Cliente no autoriza' }, 'user-1')).rejects.toBeInstanceOf(ConflictException);
     expect(repository.reject).not.toHaveBeenCalled();
