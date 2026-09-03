@@ -32,6 +32,7 @@ async function bootstrap(): Promise<void> {
   // Keep Swagger outside the versioned API prefix so it is available at /api.
   SwaggerModule.setup('api', app, document);
 
+  //await app.listen(3005, '0.0.0.0');
   await app.listen(process.env.PORT ?? 3000);
 }
 
