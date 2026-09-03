@@ -9,6 +9,7 @@ import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-ve
 import { WorkOrdersService } from './work-orders.service';
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
+import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 
@@ -23,6 +24,26 @@ export class WorkOrdersController {
   @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
   @ApiResponse({ status: 200 })
   getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
+
+  // HU-12: list work orders in EN_DIAGNOSTICO ready to be quoted. Declared
+  // before any ':id' route so the literal path wins.
+  @Get('work-orders/pending-quote')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List work orders ready to be quoted (HU-12)' })
+  @ApiResponse({ status: 200, type: [PendingQuoteWorkOrderResponseDto] })
+  listPendingQuoteOrders(): Promise<PendingQuoteWorkOrderResponseDto[]> {
+    return this.service.getPendingQuoteOrders();
+  }
+
+  // HU-12: the advisor reads the diagnostic of a work order before quoting.
+  @Get('work-orders/:id/diagnostic')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get the diagnostic for a work order (HU-12)' })
+  @ApiResponse({ status: 200, type: DiagnosticResponseDto })
+  @ApiResponse({ status: 404, description: 'Work order or diagnostic not found' })
+  getDiagnostic(@Param('id', ParseUUIDPipe) id: string): Promise<DiagnosticResponseDto> {
+    return this.service.getDiagnostic(id);
+  }
 
   @Post('work-orders')
   @Roles(UserRole.RECEPTIONIST)
