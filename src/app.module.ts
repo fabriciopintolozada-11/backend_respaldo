@@ -10,7 +10,7 @@ import Joi from 'joi';
 import { QuotesModule } from './modules/quotes/quotes.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), PrismaModule, AssignedOrdersModule, AuthModule, QuotesModule],
+  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required(), JWT_REFRESH_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), PrismaModule, AssignedOrdersModule, AuthModule, QuotesModule],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule {}

@@ -18,6 +18,22 @@ import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 export class WorkOrdersController {
   constructor(private readonly service: WorkOrdersService) {}
 
+  @Get('work-orders')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List work orders available for mechanic assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListWorkOrdersResponseDto })
+  getAvailable(@Query() query: QueryWorkOrdersDto): Promise<ListWorkOrdersResponseDto> {
+    return this.service.getAvailableWorkOrders(query);
+  }
+
+  @Get('mechanics')
+  @Roles(UserRole.WORKSHOP_LEAD)
+  @ApiOperation({ summary: 'List active mechanics for work order assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListMechanicsResponseDto })
+  getActiveMechanics(@Query() query: QueryWorkOrdersDto): Promise<ListMechanicsResponseDto> {
+    return this.service.getActiveMechanics(query);
+  }
+
   @Get('vehicles/:plate/history')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
   @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
