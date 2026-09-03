@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateQuoteDto, QuoteItemType } from '../dto/create-quote.dto';
+import { CreateQuoteDto, CreateQuoteItemDto, QuoteItemType } from '../dto/create-quote.dto';
 import { ApproveQuoteDto } from '../dto/approve-quote.dto';
 import { RejectQuoteDto } from '../dto/reject-quote.dto';
 import { QuoteDecision, QuoteDecisionResponseDto } from '../dto/quote-decision-response.dto';
@@ -15,7 +15,7 @@ export class QuoteRepository {
     return this.prisma.workOrder.findFirst({ where: { id: workOrderId, diagnostic: { isNot: null } }, select: { status: true } });
   }
 
-  create(workOrderId: string, dto: CreateQuoteDto): Promise<QuoteResponseDto> {
+  create(workOrderId: string, dto: CreateQuoteDto, laborHourlyRate: Prisma.Decimal): Promise<QuoteResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.workOrder.findUnique({ where: { id: workOrderId }, select: { id: true } });
       if (!order) throw new NotFoundException('Work order not found');
@@ -25,11 +25,17 @@ export class QuoteRepository {
       const parts = partIds.length > 0
         ? await tx.sparePart.findMany({ where: { id: { in: partIds as string[] }, isActive: true } })
         : [];
-      const details = dto.items.map((item) => {
+
+      // BE-12.4 / BE-12.5 (HU-12): dedupe repeated spare parts by merging their
+      // quantities, and always resolve the unit price from the official catalog
+      // instead of trusting whatever the frontend sent.
+      const dedupedItems = this.dedupePartItems(dto.items);
+      const details = dedupedItems.map((item) => {
         const quantity = new Prisma.Decimal(item.quantity);
         const catalogPart = item.sparePartId ? parts.find((part) => part.id === item.sparePartId) : undefined;
         if (item.itemType === QuoteItemType.PART && !catalogPart) throw new NotFoundException('Spare part not found');
-        const unitPrice = catalogPart?.unitPrice ?? new Prisma.Decimal(item.unitPrice);
+        // PART -> official catalog price; LABOR -> configured base hourly rate.
+        const unitPrice = catalogPart ? catalogPart.unitPrice : laborHourlyRate;
         return { ...item, quantity, unitPrice, subtotal: quantity.mul(unitPrice) };
       });
       const total = details.reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
@@ -52,6 +58,25 @@ export class QuoteRepository {
       where: { workOrderId },
       select: { id: true, workOrder: { select: { id: true, status: true } } },
     });
+  }
+
+  private dedupePartItems(items: CreateQuoteItemDto[]): CreateQuoteItemDto[] {
+    const merged = new Map<string, CreateQuoteItemDto>();
+    const result: CreateQuoteItemDto[] = [];
+    for (const item of items) {
+      if (item.itemType === QuoteItemType.PART && item.sparePartId) {
+        const existing = merged.get(item.sparePartId);
+        if (existing) {
+          existing.quantity += item.quantity;
+          continue;
+        }
+        merged.set(item.sparePartId, item);
+        result.push(item);
+      } else {
+        result.push(item);
+      }
+    }
+    return result;
   }
 
   approve(workOrderId: string, dto: ApproveQuoteDto, recordedBy: string): Promise<QuoteDecisionResponseDto> {
