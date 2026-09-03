@@ -57,6 +57,28 @@ export class WorkOrdersService {
     return this.repository.createVehicleEntry({ ...dto, plate: normalizePlate(dto.plate) }, receptionistId);
   }
 
+  async getAvailableWorkOrders(query: QueryWorkOrdersDto): Promise<ListWorkOrdersResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const [rows, total] = await Promise.all([
+      this.repository.findAvailable(page, pageSize),
+      this.repository.countAvailable(),
+    ]);
+
+    return { data: rows, total, page, pageSize };
+  }
+
+  async getActiveMechanics(query: QueryWorkOrdersDto): Promise<ListMechanicsResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const [data, total] = await Promise.all([
+      this.repository.findActiveMechanics(page, pageSize),
+      this.repository.countActiveMechanics(),
+    ]);
+
+    return { data, total, page, pageSize };
+  }
+
   async createDiagnostic(id: string, mechanicId: string, dto: CreateDiagnosticDto) {
     const order = await this.repository.findAssignedWorkOrder(id, mechanicId);
     if (!order) throw new UnprocessableEntityException('RN-04: work order is not assigned to this mechanic');

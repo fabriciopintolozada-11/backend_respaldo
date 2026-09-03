@@ -11,7 +11,22 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, validationSchema: Joi.object({ DATABASE_URL: Joi.string().required(), JWT_SECRET: Joi.string().min(32).required() }) }), JwtModule.register({}), PrismaModule, AssignedOrdersModule, AuthModule, QuotesModule, SparePartsModule],
+  imports: [
+    ConfigModule.forRoot({ 
+      isGlobal: true, 
+      validationSchema: Joi.object({ 
+        DATABASE_URL: Joi.string().required(), 
+        JWT_SECRET: Joi.string().min(32).required(), 
+        JWT_REFRESH_SECRET: Joi.string().min(32).required() 
+      }) 
+    }), 
+    JwtModule.register({}), 
+    PrismaModule, 
+    AssignedOrdersModule, 
+    AuthModule, 
+    QuotesModule, 
+    SparePartsModule
+  ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule {}
