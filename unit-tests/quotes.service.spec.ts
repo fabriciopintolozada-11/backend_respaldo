@@ -1,4 +1,5 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { QuotesService } from '../src/modules/quotes/quotes.service';
 import { QuoteItemType } from '../src/modules/quotes/dto/create-quote.dto';
 import { QuoteRepository } from '../src/modules/quotes/repositories/quote.repository';
@@ -9,6 +10,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
     findOrderForQuote: jest.fn(),
     create: jest.fn(),
   };
+  const configService = { get: jest.fn() };
 
   const pendingQuote = {
     id: 'quote-1',
@@ -26,7 +28,8 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new QuotesService(repository as unknown as QuoteRepository);
+    configService.get.mockReturnValue('65');
+    service = new QuotesService(repository as unknown as QuoteRepository, configService as unknown as ConfigService);
   });
 
   // Escenario a) Cálculo exitoso y transición a PRESUPUESTO_ENVIADO.
@@ -45,7 +48,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
       const result = await service.create('order-1', dto);
 
       expect(repository.findOrderForQuote).toHaveBeenCalledWith('order-1');
-      expect(repository.create).toHaveBeenCalledWith('order-1', dto);
+      expect(repository.create).toHaveBeenCalledWith('order-1', dto, expect.anything());
       expect(result.total).toBe('120');
       expect(result.laborSubtotal).toBe('100');
       expect(result.partsSubtotal).toBe('20');
