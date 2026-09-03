@@ -44,7 +44,7 @@ export class WorkOrderRepository {
         create: { customerId: customer.id, plate: dto.plate, brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year, isFullyElectric: dto.vehicle.isFullyElectric },
       });
       const workOrder = await transaction.workOrder.create({
-        data: { vehicleId: vehicle.id, customerId: customer.id, receptionistId, initialComplaint: dto.initialComplaint },
+        data: { vehicleId: vehicle.id, customerId: vehicle.customerId, receptionistId, initialComplaint: dto.initialComplaint },
         select: { id: true, vehicleId: true, customerId: true, status: true, initialComplaint: true, createdAt: true },
       });
       await transaction.technicalHistory.create({

@@ -1,7 +1,7 @@
 import { UnprocessableEntityException } from '@nestjs/common';
-import { normalizePlate, validateVehicleCanBeReceived } from './vehicle-entry.rules';
+import { normalizePlate, validateVehicleCanBeReceived } from '../src/domain/work-orders/vehicle-entry.rules';
 
-describe('Vehicle entry rules (US-01)', () => {
+describe('Vehicle entry rules (HU-01)', () => {
   it('normalizes plates for history lookup', () => {
     expect(normalizePlate(' abc-123 ')).toBe('ABC-123');
   });
