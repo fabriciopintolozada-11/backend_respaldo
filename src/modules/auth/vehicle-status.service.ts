@@ -4,10 +4,16 @@ import { VehicleStatusResponseDto } from './dto/vehicle-status.response.dto';
 
 const WORK_ORDER_STAGES: Record<string, string> = {
   RECIBIDO: 'Recibido',
+  ASIGNADA: 'Asignado',
+  EN_DIAGNOSTICO: 'En diagnóstico',
+  PRESUPUESTO_ENVIADO: 'Presupuesto enviado',
+  APROBADO: 'Aprobado',
   EN_REPARACION: 'En reparación',
   ESPERANDO_REPUESTO: 'Esperando repuesto',
   FINALIZADO: 'Finalizado',
   LISTO_ENTREGA: 'Listo para entrega',
+  ENTREGADO: 'Entregado',
+  RECHAZADO: 'Rechazado',
 };
 
 // RN-17: the public lookup must never reveal whether the failure comes from the
