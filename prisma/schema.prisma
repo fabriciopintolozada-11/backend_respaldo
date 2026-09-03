@@ -16,6 +16,7 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt    DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  stockMovements StockMovement[]
 
   @@index([username])
   @@map("users")
@@ -65,6 +66,7 @@ model WorkOrder {
   diagnostic       Diagnostic?
   quote            Quote?
   notifications    Notification[]
+  stockMovements   StockMovement[]
 
   @@index([vehicleId])
   @@index([status])
@@ -82,8 +84,29 @@ model SparePart {
   reservedStock  Int      @default(0) @map("reserved_stock")
   isActive       Boolean  @default(true) @map("is_active")
   quoteItems     QuotePart[]
+  stockMovements StockMovement[]
 
   @@map("spare_parts")
+}
+
+// BE-17: immutable audit trail (kardex) of physical inventory movements.
+// Insert-only table: records are never updated or deleted. RN-08.
+model StockMovement {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  workOrderId String    @db.Uuid @map("work_order_id")
+  sparePartId String    @db.Uuid @map("spare_part_id")
+  userId      String    @db.Uuid @map("user_id")
+  quantity    Int       @db.SmallInt @map("quantity")
+  type        String    @db.VarChar(20) @map("type")
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([workOrderId])
+  @@index([sparePartId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("stock_movements")
 }
 
 model Quote {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -9,9 +9,8 @@ import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-ve
 import { WorkOrdersService } from './work-orders.service';
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
-import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
-import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
-import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
+import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
+import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -57,5 +56,21 @@ export class WorkOrdersController {
   @ApiResponse({ status: 201, type: DiagnosticResponseDto })
   createDiagnostic(@Param('id') id: string, @Body() dto: CreateDiagnosticDto, @Req() request: Request): Promise<DiagnosticResponseDto> {
     return this.service.createDiagnostic(id, request.user.id, dto);
+  }
+
+  @Post('work-orders/:id/consume-part')
+  @Roles(UserRole.MECHANIC, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm spare part installation, decrement physical stock and record kardex (HU-07, RN-04, RN-07, RN-08, RN-09, RN-01)' })
+  @ApiResponse({ status: 200, type: WorkOrderPartResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 422, description: 'Work order state, ownership, reserved part or stock rules violated' })
+  consumePart(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ConsumeSparePartDto,
+    @Req() request: Request,
+  ): Promise<WorkOrderPartResponseDto> {
+    return this.service.consumePart(id, request.user.id, request.user.role, dto);
   }
 }

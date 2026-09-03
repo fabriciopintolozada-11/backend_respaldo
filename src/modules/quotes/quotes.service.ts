@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { ApproveQuoteDto } from './dto/approve-quote.dto';
 import { RejectQuoteDto } from './dto/reject-quote.dto';
@@ -10,6 +10,16 @@ export class QuotesService {
   constructor(private readonly repository: QuoteRepository) {}
 
   async create(workOrderId: string, dto: CreateQuoteDto) {
+    // RN-21: defense in depth. Financial inputs are validated again at the
+    // domain layer even though the HTTP DTO already enforces @Min(0).
+    const invalid = dto.items.find(
+      (item) => item.quantity < 0 || item.unitPrice < 0,
+    );
+    if (invalid) {
+      throw new UnprocessableEntityException(
+        'Quote quantities and unit prices must be non-negative (RN-21)',
+      );
+    }
     const order = await this.repository.findOrderForQuote(workOrderId);
     if (!order) throw new ConflictException('Work order not found or has no diagnostic');
     if (order.status !== 'EN_DIAGNOSTICO') {
