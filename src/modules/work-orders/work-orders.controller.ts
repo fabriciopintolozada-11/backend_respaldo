@@ -12,6 +12,8 @@ import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
 import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
+import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
+import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
@@ -96,5 +98,25 @@ export class WorkOrdersController {
     @Req() request: Request,
   ): Promise<WorkOrderPartResponseDto> {
     return this.service.consumePart(id, request.user.id, request.user.role, dto);
+  }
+
+  // US-13 / RN-05: set a work order to EN_ESPERA_DE_REPUESTO when a spare
+  // part is physically unavailable. Only the assigned mechanic or the
+  // workshop lead can trigger this transition.
+  @Post('work-orders/:id/awaiting-part')
+  @Roles(UserRole.MECHANIC, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set work order to awaiting part (US-13, RN-05, RN-04, RN-19)' })
+  @ApiResponse({ status: 200, type: AwaitingPartResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status (RN-05)' })
+  @ApiResponse({ status: 422, description: 'Work order not assigned to this mechanic or spare part not associated' })
+  setAwaitingPart(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetAwaitingPartDto,
+    @Req() request: Request,
+  ): Promise<AwaitingPartResponseDto> {
+    return this.service.setAwaitingPart(id, request.user.id, request.user.role, dto);
   }
 }
