@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -10,6 +10,7 @@ import { ApproveQuoteDto } from './dto/approve-quote.dto';
 import { RejectQuoteDto } from './dto/reject-quote.dto';
 import { QuoteDecisionResponseDto } from './dto/quote-decision-response.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
+import { QuoteApprovalDetailResponseDto } from './dto/quote-approval-query-response.dto';
 import { QuotesService } from './quotes.service';
 
 @ApiTags('quotes')
@@ -19,6 +20,15 @@ import { QuotesService } from './quotes.service';
 @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
 export class QuotesController {
   constructor(private readonly service: QuotesService) {}
+
+  @Get('work-orders/:id/budget-approval')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get quote and work order detail for customer approval (HU-09)' })
+  @ApiResponse({ status: 200, type: QuoteApprovalDetailResponseDto })
+  @ApiResponse({ status: 404, description: 'Quote not found' })
+  getApprovalDetail(@Param('id', ParseUUIDPipe) id: string): Promise<QuoteApprovalDetailResponseDto> {
+    return this.service.getApprovalDetail(id);
+  }
 
   @Post(':id/quote')
   @ApiOperation({ summary: 'Create a workshop quote in BOB (US-12, RN-21)' })

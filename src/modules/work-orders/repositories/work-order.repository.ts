@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '../../../generated/prisma/client';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
@@ -9,12 +10,144 @@ import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 
+export interface AvailableWorkOrderRow {
+  id: string;
+  vehicleId: string;
+  plate: string;
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: number;
+  customerName: string;
+  customerIdentification: string;
+  initialComplaint: string;
+  status: string;
+  createdAt: Date;
+  mechanicId: string | null;
+}
+
+export interface ActiveMechanicRow {
+  id: string;
+  isActive: boolean;
+}
+
 @Injectable()
 export class WorkOrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findAssignedWorkOrder(id: string, mechanicId: string) {
     return this.prisma.workOrder.findFirst({ where: { id, mechanicId }, select: { status: true } });
+  }
+
+  // HU-12: the advisor (WORKSHOP_LEAD / RECEPTIONIST) reads the diagnostic of a
+  // work order before building a quote. Non-financial allowlist only (RN-16).
+  findDiagnostic(workOrderId: string): Promise<{
+    id: string;
+    status: string;
+    vehicleId: string;
+    diagnostic: {
+      id: string;
+      workOrderId: string;
+      description: string;
+      suggestedTasks: Prisma.JsonValue;
+      suggestedPartIds: Prisma.JsonValue;
+      estimatedHours: Prisma.Decimal;
+      createdAt: Date;
+    } | null;
+  } | null> {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        diagnostic: {
+          select: {
+            id: true,
+            workOrderId: true,
+            description: true,
+            suggestedTasks: true,
+            suggestedPartIds: true,
+            estimatedHours: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  // HU-12: list work orders awaiting a quote (EN_DIAGNOSTICO). No monetary
+  // fields are exposed to the advisor list (RN-16).
+  findPendingQuoteOrders() {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'EN_DIAGNOSTICO' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        initialComplaint: true,
+        createdAt: true,
+        vehicle: { select: { plate: true, brand: true, model: true, year: true } },
+        customer: { select: { name: true, identification: true } },
+      },
+    });
+  }
+
+  findAvailable(page: number, pageSize: number): Promise<AvailableWorkOrderRow[]> {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'RECIBIDO', mechanicId: null },
+      orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        vehicleId: true,
+        status: true,
+        initialComplaint: true,
+        createdAt: true,
+        mechanicId: true,
+        vehicle: {
+          select: {
+            plate: true,
+            brand: true,
+            model: true,
+            year: true,
+            customer: { select: { name: true, identification: true } },
+          },
+        },
+      },
+    }).then((rows) => rows.map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicleId,
+      plate: row.vehicle.plate,
+      vehicleBrand: row.vehicle.brand,
+      vehicleModel: row.vehicle.model,
+      vehicleYear: row.vehicle.year,
+      customerName: row.vehicle.customer.name,
+      customerIdentification: row.vehicle.customer.identification,
+      initialComplaint: row.initialComplaint,
+      status: row.status,
+      createdAt: row.createdAt,
+      mechanicId: row.mechanicId,
+    })));
+  }
+
+  countAvailable(): Promise<number> {
+    return this.prisma.workOrder.count({ where: { status: 'RECIBIDO', mechanicId: null } });
+  }
+
+  findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
+    return this.prisma.mechanic.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: { id: true, isActive: true },
+    });
+  }
+
+  countActiveMechanics(): Promise<number> {
+    return this.prisma.mechanic.count({ where: { isActive: true } });
   }
 
   async findVehicleHistory(plate: string) {
@@ -46,7 +179,7 @@ export class WorkOrderRepository {
         create: { customerId: customer.id, plate: dto.plate, brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year, isFullyElectric: dto.vehicle.isFullyElectric },
       });
       const workOrder = await transaction.workOrder.create({
-        data: { vehicleId: vehicle.id, customerId: customer.id, receptionistId, initialComplaint: dto.initialComplaint },
+        data: { vehicleId: vehicle.id, customerId: vehicle.customerId, receptionistId, initialComplaint: dto.initialComplaint },
         select: { id: true, vehicleId: true, customerId: true, status: true, initialComplaint: true, createdAt: true },
       });
       await transaction.technicalHistory.create({
@@ -179,6 +312,7 @@ export class WorkOrderRepository {
         data: {
           physicalStock: { decrement: dto.quantity },
           reservedStock: { decrement: dto.quantity },
+          lastMovementAt: new Date(),
         },
       });
       if (stockUpdate.count !== 1) {

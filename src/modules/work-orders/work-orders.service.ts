@@ -7,7 +7,12 @@ import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
+import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
+import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
+import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
+import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 
 @Injectable()
 export class WorkOrdersService {
@@ -17,9 +22,66 @@ export class WorkOrdersService {
     return this.repository.findVehicleHistory(normalizePlate(plate));
   }
 
+  // HU-12: the advisor reads the diagnostic for the work order before quoting.
+  async getDiagnostic(id: string): Promise<DiagnosticResponseDto> {
+    const order = await this.repository.findDiagnostic(id);
+    if (!order) throw new NotFoundException('Work order not found');
+    if (!order.diagnostic) throw new NotFoundException('Work order has no diagnostic yet');
+    const { diagnostic } = order;
+    return {
+      id: diagnostic.id,
+      workOrderId: diagnostic.workOrderId,
+      description: diagnostic.description,
+      suggestedTasks: Array.isArray(diagnostic.suggestedTasks) ? diagnostic.suggestedTasks as string[] : [],
+      suggestedPartIds: Array.isArray(diagnostic.suggestedPartIds) ? diagnostic.suggestedPartIds as string[] : [],
+      estimatedHours: Number(diagnostic.estimatedHours),
+      createdAt: diagnostic.createdAt,
+    };
+  }
+
+  // HU-12: list work orders in EN_DIAGNOSTICO that are ready to be quoted.
+  getPendingQuoteOrders(): Promise<PendingQuoteWorkOrderResponseDto[]> {
+    return this.repository.findPendingQuoteOrders().then((rows) =>
+      rows.map((row) => ({
+        id: row.id,
+        vehicleId: row.vehicleId,
+        plate: row.vehicle.plate,
+        brand: row.vehicle.brand,
+        model: row.vehicle.model,
+        year: row.vehicle.year,
+        customerName: row.customer.name,
+        status: row.status,
+        initialComplaint: row.initialComplaint,
+        createdAt: row.createdAt,
+      })),
+    );
+  }
+
   registerVehicleEntry(dto: RegisterVehicleEntryDto, receptionistId: string) {
     validateVehicleCanBeReceived(dto.vehicle.isFullyElectric);
     return this.repository.createVehicleEntry({ ...dto, plate: normalizePlate(dto.plate) }, receptionistId);
+  }
+
+  async getAvailableWorkOrders(query: QueryWorkOrdersDto): Promise<ListWorkOrdersResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const [rows, total] = await Promise.all([
+      this.repository.findAvailable(page, pageSize),
+      this.repository.countAvailable(),
+    ]);
+
+    return { data: rows, total, page, pageSize };
+  }
+
+  async getActiveMechanics(query: QueryWorkOrdersDto): Promise<ListMechanicsResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const [data, total] = await Promise.all([
+      this.repository.findActiveMechanics(page, pageSize),
+      this.repository.countActiveMechanics(),
+    ]);
+
+    return { data, total, page, pageSize };
   }
 
   async createDiagnostic(id: string, mechanicId: string, dto: CreateDiagnosticDto) {

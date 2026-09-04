@@ -38,7 +38,7 @@ describe('QuoteRepository', () => {
 
     const result = await repository.create('work-order-id', {
       items: [{ description: 'Cambio de aceite', itemType: QuoteItemType.LABOR, quantity: 2, unitPrice: 50 }],
-    });
+    }, new Prisma.Decimal('50'));
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.quote.upsert).toHaveBeenCalledWith(expect.objectContaining({
@@ -62,7 +62,7 @@ describe('QuoteRepository', () => {
     await new QuoteRepository(prisma as never).create('order-1', { items: [
        { description: 'Parte', itemType: QuoteItemType.PART, quantity: 0.1, unitPrice: 0.2, sparePartId: 'part-1' },
       { description: 'Mano de obra', itemType: QuoteItemType.LABOR, quantity: 2, unitPrice: 10.05 },
-    ] });
+    ] }, new Prisma.Decimal('10.05'));
     const create = tx.quote.upsert.mock.calls[0][0].create;
     expect(create.total).toEqual(new Prisma.Decimal('20.12'));
     expect(create.details.create[0].subtotal).toEqual(new Prisma.Decimal('0.02'));
@@ -72,14 +72,14 @@ describe('QuoteRepository', () => {
   it('rejects a missing work order before quote persistence', async () => {
     const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue(null) }, quote: { upsert: jest.fn() } };
     const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
-    await expect(new QuoteRepository(prisma as never).create('missing', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1 }] })).rejects.toThrow('Work order not found');
+    await expect(new QuoteRepository(prisma as never).create('missing', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1 }] }, new Prisma.Decimal('65'))).rejects.toThrow('Work order not found');
     expect(tx.quote.upsert).not.toHaveBeenCalled();
   });
 
   it('does not update the work order when quote persistence fails', async () => {
      const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() }, quote: { upsert: jest.fn().mockRejectedValue(new Error('database failure')) }, sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'part-1', unitPrice: new Prisma.Decimal('0.2') }]) } };
     const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
-     await expect(new QuoteRepository(prisma as never).create('order-1', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1, sparePartId: 'part-1' }] })).rejects.toThrow('database failure');
+     await expect(new QuoteRepository(prisma as never).create('order-1', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1, sparePartId: 'part-1' }] }, new Prisma.Decimal('65'))).rejects.toThrow('database failure');
     expect(tx.workOrder.update).not.toHaveBeenCalled();
   });
 });

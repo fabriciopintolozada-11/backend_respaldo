@@ -55,7 +55,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
 
     expect(tx.sparePart.updateMany).toHaveBeenCalledWith({
       where: { id: 'sp-1', physicalStock: { gte: 1 }, reservedStock: { gte: 1 } },
-      data: { physicalStock: { decrement: 1 }, reservedStock: { decrement: 1 } },
+      data: { physicalStock: { decrement: 1 }, reservedStock: { decrement: 1 }, lastMovementAt: expect.any(Date) },
     });
     expect(tx.quotePart.update).toHaveBeenCalledWith({
       where: { id: 'qp-1' },

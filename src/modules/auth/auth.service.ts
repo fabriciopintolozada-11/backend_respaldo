@@ -31,18 +31,24 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    const user = await this.repository.findByUsername(dto.username.trim());
-    if (!user || !user.isActive) {
-      // US-00: unified message hides whether the account exists or is inactive.
-      throw new UnauthorizedException(INVALID_CREDENTIALS);
-    }
+    try {
+      const user = await this.repository.findByUsername(dto.username.trim());
+      if (!user || !user.isActive) {
+        // US-00: unified message hides whether the account exists or is inactive.
+        throw new UnauthorizedException(INVALID_CREDENTIALS);
+      }
 
-    const passwordValid = await argon2.verify(user.passwordHash, dto.password);
-    if (!passwordValid) {
-      throw new UnauthorizedException(INVALID_CREDENTIALS);
-    }
+      const passwordValid = await argon2.verify(user.passwordHash, dto.password);
+      if (!passwordValid) {
+        throw new UnauthorizedException(INVALID_CREDENTIALS);
+      }
 
-    return this.buildAuthResponse(user);
+      return await this.buildAuthResponse(user);
+    } catch (error: unknown) {
+      // Keep the real cause visible during local diagnosis without logging credentials or tokens.
+      console.error('Auth login failed:', error);
+      throw error;
+    }
   }
 
   async refresh(dto: RefreshDto): Promise<AuthResponseDto> {

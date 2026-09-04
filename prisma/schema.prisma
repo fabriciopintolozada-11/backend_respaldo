@@ -80,15 +80,20 @@ model SparePart {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
   code           String   @unique @db.VarChar(50) @map("code")
   name           String   @db.VarChar(150) @map("name")
+  category       String   @default("MOTOR") @db.VarChar(40) @map("category")
   unitPrice      Decimal  @db.Decimal(12, 2) @map("unit_price")
   physicalStock  Int      @default(0) @map("physical_stock")
   availableStock Int      @default(0) @map("available_stock")
   reservedStock  Int      @default(0) @map("reserved_stock")
   isActive       Boolean  @default(true) @map("is_active")
+  lastMovementAt DateTime @default(now()) @db.Timestamptz(6) @map("last_movement_at")
   quoteItems     QuotePart[]
   stockMovements StockMovement[]
   discrepancies  InventoryDiscrepancy[]
 
+  @@index([category])
+  @@index([name])
+  @@index([lastMovementAt])
   @@map("spare_parts")
 }
 
@@ -96,13 +101,16 @@ model SparePart {
 // Insert-only table: records are never updated or deleted. RN-08.
 model StockMovement {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
-  workOrderId String    @db.Uuid @map("work_order_id")
+  workOrderId String?   @db.Uuid @map("work_order_id")
   sparePartId String    @db.Uuid @map("spare_part_id")
   userId      String    @db.Uuid @map("user_id")
   quantity    Int       @db.SmallInt @map("quantity")
   type        String    @db.VarChar(20) @map("type")
+  reason      String?   @db.Text @map("reason")
+  previousPhysicalStock Int? @map("previous_physical_stock")
+  newPhysicalStock Int? @map("new_physical_stock")
   createdAt   DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
-  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
   sparePart   SparePart @relation(fields: [sparePartId], references: [id])
   user        User      @relation(fields: [userId], references: [id])
 

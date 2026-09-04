@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -9,10 +9,14 @@ import { RegisterVehicleEntryDto, WorkOrderResponseDto } from './dto/register-ve
 import { WorkOrdersService } from './work-orders.service';
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
+import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
+import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
+import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -20,11 +24,47 @@ import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
 export class WorkOrdersController {
   constructor(private readonly service: WorkOrdersService) {}
 
+  @Get('work-orders')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List work orders available for mechanic assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListWorkOrdersResponseDto })
+  getAvailable(@Query() query: QueryWorkOrdersDto): Promise<ListWorkOrdersResponseDto> {
+    return this.service.getAvailableWorkOrders(query);
+  }
+
+  @Get('mechanics')
+  @Roles(UserRole.WORKSHOP_LEAD)
+  @ApiOperation({ summary: 'List active mechanics for work order assignment (US-04, RN-14)' })
+  @ApiResponse({ status: 200, type: ListMechanicsResponseDto })
+  getActiveMechanics(@Query() query: QueryWorkOrdersDto): Promise<ListMechanicsResponseDto> {
+    return this.service.getActiveMechanics(query);
+  }
+
   @Get('vehicles/:plate/history')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
   @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
   @ApiResponse({ status: 200 })
   getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
+
+  // HU-12: list work orders in EN_DIAGNOSTICO ready to be quoted. Declared
+  // before any ':id' route so the literal path wins.
+  @Get('work-orders/pending-quote')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List work orders ready to be quoted (HU-12)' })
+  @ApiResponse({ status: 200, type: [PendingQuoteWorkOrderResponseDto] })
+  listPendingQuoteOrders(): Promise<PendingQuoteWorkOrderResponseDto[]> {
+    return this.service.getPendingQuoteOrders();
+  }
+
+  // HU-12: the advisor reads the diagnostic of a work order before quoting.
+  @Get('work-orders/:id/diagnostic')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get the diagnostic for a work order (HU-12)' })
+  @ApiResponse({ status: 200, type: DiagnosticResponseDto })
+  @ApiResponse({ status: 404, description: 'Work order or diagnostic not found' })
+  getDiagnostic(@Param('id', ParseUUIDPipe) id: string): Promise<DiagnosticResponseDto> {
+    return this.service.getDiagnostic(id);
+  }
 
   @Post('work-orders')
   @Roles(UserRole.RECEPTIONIST)

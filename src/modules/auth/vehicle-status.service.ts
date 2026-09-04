@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { VehicleStatusRepository } from './repositories/vehicle-status.repository';
-import { VehicleStatusResponseDto } from './dto/vehicle-status.response.dto';
+import { PublicVehicleStatusResponseDto } from './dto/vehicle-status.response.dto';
 
 const WORK_ORDER_STAGES: Record<string, string> = {
   RECIBIDO: 'Recibido',
@@ -20,11 +20,16 @@ const WORK_ORDER_STAGES: Record<string, string> = {
 // plate, the identification or another customer's work order.
 const WORK_ORDER_NOT_FOUND_MESSAGE = 'No valid work order found for the provided data';
 
+// BE-02.2 (US-02 / RN-17): only these operational states are visible through the
+// public lookup. Terminal / inactive states (RECHAZADO, CANCELADA, CERRADA,
+// ENTREGADO) resolve to a 404 so no data leaks. Enforced at the repository via
+// its own ACTIVE_WORK_ORDER_STATES constant.
+
 @Injectable()
 export class VehicleStatusService {
   constructor(private readonly repository: VehicleStatusRepository) {}
 
-  async getStatus(plate: string, identification: string): Promise<VehicleStatusResponseDto> {
+  async getStatus(plate: string, identification: string): Promise<PublicVehicleStatusResponseDto> {
     const order = await this.repository.findLatestByPlateAndIdentification(
       this.normalizePlate(plate),
       identification.trim(),
@@ -35,6 +40,7 @@ export class VehicleStatusService {
     }
 
     const status = order.status;
+    const readyForPickup = this.isVehicleReadyForPickup(status);
     return {
       workOrderId: order.id,
       plate: order.vehicle.plate,
@@ -46,7 +52,7 @@ export class VehicleStatusService {
       createdAt: order.createdAt,
       status,
       stage: this.getWorkOrderStage(status),
-      readyForPickup: this.isVehicleReadyForPickup(status),
+      readyForPickup,
     };
   }
 
