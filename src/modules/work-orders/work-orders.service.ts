@@ -5,6 +5,8 @@ import { normalizePlate, validateVehicleCanBeReceived } from '../../domain/work-
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
+import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
+import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
@@ -16,6 +18,41 @@ export class WorkOrdersService {
 
   getVehicleHistory(plate: string) {
     return this.repository.findVehicleHistory(normalizePlate(plate));
+  }
+
+  // HU-12: the advisor reads the diagnostic for the work order before quoting.
+  async getDiagnostic(id: string): Promise<DiagnosticResponseDto> {
+    const order = await this.repository.findDiagnostic(id);
+    if (!order) throw new NotFoundException('Work order not found');
+    if (!order.diagnostic) throw new NotFoundException('Work order has no diagnostic yet');
+    const { diagnostic } = order;
+    return {
+      id: diagnostic.id,
+      workOrderId: diagnostic.workOrderId,
+      description: diagnostic.description,
+      suggestedTasks: Array.isArray(diagnostic.suggestedTasks) ? diagnostic.suggestedTasks as string[] : [],
+      suggestedPartIds: Array.isArray(diagnostic.suggestedPartIds) ? diagnostic.suggestedPartIds as string[] : [],
+      estimatedHours: Number(diagnostic.estimatedHours),
+      createdAt: diagnostic.createdAt,
+    };
+  }
+
+  // HU-12: list work orders in EN_DIAGNOSTICO that are ready to be quoted.
+  getPendingQuoteOrders(): Promise<PendingQuoteWorkOrderResponseDto[]> {
+    return this.repository.findPendingQuoteOrders().then((rows) =>
+      rows.map((row) => ({
+        id: row.id,
+        vehicleId: row.vehicleId,
+        plate: row.vehicle.plate,
+        brand: row.vehicle.brand,
+        model: row.vehicle.model,
+        year: row.vehicle.year,
+        customerName: row.customer.name,
+        status: row.status,
+        initialComplaint: row.initialComplaint,
+        createdAt: row.createdAt,
+      })),
+    );
   }
 
   registerVehicleEntry(dto: RegisterVehicleEntryDto, receptionistId: string) {

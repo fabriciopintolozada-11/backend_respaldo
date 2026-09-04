@@ -35,6 +35,48 @@ export class WorkOrderRepository {
     return this.prisma.workOrder.findFirst({ where: { id, mechanicId }, select: { status: true } });
   }
 
+  // HU-12: the advisor (WORKSHOP_LEAD / RECEPTIONIST) reads the diagnostic of a
+  // work order before building a quote. Non-financial allowlist only (RN-16).
+  findDiagnostic(workOrderId: string) {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        diagnostic: {
+          select: {
+            id: true,
+            workOrderId: true,
+            description: true,
+            suggestedTasks: true,
+            suggestedPartIds: true,
+            estimatedHours: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  // HU-12: list work orders awaiting a quote (EN_DIAGNOSTICO). No monetary
+  // fields are exposed to the advisor list (RN-16).
+  findPendingQuoteOrders() {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'EN_DIAGNOSTICO' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        initialComplaint: true,
+        createdAt: true,
+        vehicle: { select: { plate: true, brand: true, model: true, year: true } },
+        customer: { select: { name: true, identification: true } },
+      },
+    });
+  }
+
   findAvailable(page: number, pageSize: number): Promise<AvailableWorkOrderRow[]> {
     return this.prisma.workOrder.findMany({
       where: { status: 'RECIBIDO', mechanicId: null },

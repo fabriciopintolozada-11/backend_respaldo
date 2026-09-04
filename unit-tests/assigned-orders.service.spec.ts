@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssignedOrdersService } from './assigned-orders.service';
-import { MechanicOrdersRepository } from './repositories/mechanic-orders.repository';
+import { AssignedOrdersService } from '../src/modules/work-orders/assigned-orders.service';
+import { MechanicOrdersRepository } from '../src/modules/work-orders/repositories/mechanic-orders.repository';
 
 describe('AssignedOrdersService (US-03)', () => {
   let service: AssignedOrdersService;
