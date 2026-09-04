@@ -16,7 +16,8 @@ model User {
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt    DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
-  stockMovements StockMovement[]
+  stockMovements      StockMovement[]
+  reportedDiscrepancies InventoryDiscrepancy[]
 
   @@index([username])
   @@map("users")
@@ -65,8 +66,9 @@ model WorkOrder {
   mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
   diagnostic       Diagnostic?
   quote            Quote?
-  notifications    Notification[]
-  stockMovements   StockMovement[]
+  notifications          Notification[]
+  stockMovements         StockMovement[]
+  inventoryDiscrepancies InventoryDiscrepancy[]
 
   @@index([vehicleId])
   @@index([status])
@@ -85,6 +87,7 @@ model SparePart {
   isActive       Boolean  @default(true) @map("is_active")
   quoteItems     QuotePart[]
   stockMovements StockMovement[]
+  discrepancies  InventoryDiscrepancy[]
 
   @@map("spare_parts")
 }
@@ -215,4 +218,28 @@ model TechnicalHistory {
 
   @@index([vehicleId, createdAt(sort: Desc)])
   @@map("technical_histories")
+}
+
+// US-13: inventory discrepancy register for auditing physical stock mismatches
+// detected by the mechanic when a part is not physically available in the warehouse.
+// Insert-only: records are never updated or deleted (BE-17).
+model InventoryDiscrepancy {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  workOrderId    String    @db.Uuid @map("work_order_id")
+  sparePartId    String    @db.Uuid @map("spare_part_id")
+  reportedBy     String    @db.Uuid @map("reported_by")
+  quantity       Int       @db.SmallInt @map("quantity")
+  reason         String    @db.Text @map("reason")
+  status         String    @default("PENDING") @db.VarChar(20) @map("status")
+  resolvedAt     DateTime? @db.Timestamptz(6) @map("resolved_at")
+  resolvedBy     String?   @db.Uuid @map("resolved_by")
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder      WorkOrder @relation(fields: [workOrderId], references: [id])
+  sparePart      SparePart @relation(fields: [sparePartId], references: [id])
+  reporter       User      @relation(fields: [reportedBy], references: [id])
+
+  @@index([workOrderId])
+  @@index([sparePartId])
+  @@index([status])
+  @@map("inventory_discrepancies")
 }

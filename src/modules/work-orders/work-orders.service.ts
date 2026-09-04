@@ -5,6 +5,8 @@ import { normalizePlate, validateVehicleCanBeReceived } from '../../domain/work-
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
+import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
+import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @Injectable()
@@ -70,5 +72,51 @@ export class WorkOrdersService {
     const nextStatus = context.status === 'APROBADO' ? 'EN_REPARACION' : context.status;
 
     return this.repository.consumePart(workOrderId, dto, userId, nextStatus);
+  }
+
+  // US-13: set a work order to EN_ESPERA_DE_REPUESTO when a spare part is
+  // physically unavailable in the warehouse. All business rules live here
+  // (BE-06); the repository performs the atomic persistence (BE-16).
+  async setAwaitingPart(
+    workOrderId: string,
+    userId: string,
+    role: string,
+    dto: SetAwaitingPartDto,
+  ): Promise<AwaitingPartResponseDto> {
+    const context = await this.repository.findAwaitingPartContext(workOrderId);
+    if (!context) throw new NotFoundException('Work order not found');
+
+    // RN-04: only the assigned mechanic can set the order to awaiting part;
+    // the workshop lead oversees and is always allowed.
+    if (role === UserRole.MECHANIC && context.mechanicId !== userId) {
+      throw new UnprocessableEntityException('RN-04: work order is not assigned to this mechanic');
+    }
+
+    // RN-05: the work order must be strictly in EN_REPARACION to transition
+    // to EN_ESPERA_DE_REPUESTO.
+    if (context.status !== 'EN_REPARACION') {
+      throw new ConflictException(
+        'RN-05: work order must be in EN_REPARACION to set awaiting part',
+      );
+    }
+
+    // Validate that the missing part belongs to this work order's approved
+    // quote. This prevents reporting a part that was never requested.
+    const quoteParts = context.quote?.parts ?? [];
+    const partBelongsToOrder = quoteParts.some(
+      (p) => p.sparePartId === dto.missingPartId,
+    );
+    if (!partBelongsToOrder) {
+      throw new UnprocessableEntityException(
+        'The reported spare part is not associated with this work order',
+      );
+    }
+
+    return this.repository.setAwaitingPart(
+      workOrderId,
+      dto,
+      userId,
+      context.vehicleId,
+    );
   }
 }

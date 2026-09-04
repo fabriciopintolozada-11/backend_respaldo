@@ -6,6 +6,8 @@ import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
 import { ConsumeSparePartDto } from '../dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
+import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
+import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 
 @Injectable()
 export class WorkOrderRepository {
@@ -215,6 +217,82 @@ export class WorkOrderRepository {
         name: part.sparePart.name,
         quantity: dto.quantity,
         status: 'INSTALLED',
+      };
+    });
+  }
+
+  // US-13: read context needed to validate an awaiting-part transition.
+  // Returns ownership, status and the quote parts linked to this work order
+  // so the service can verify the missingPartId belongs to the order.
+  findAwaitingPartContext(workOrderId: string) {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        mechanicId: true,
+        vehicleId: true,
+        quote: {
+          select: {
+            parts: {
+              select: {
+                id: true,
+                sparePartId: true,
+                quantity: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // US-13 / BE-16 / RN-05 / RN-19: atomically set a work order to
+  // EN_ESPERA_DE_REPUESTO. The state transition, the immutable technical
+  // history entry and the inventory discrepancy record all run inside a
+  // single Prisma transaction (BE-16).
+  setAwaitingPart(
+    workOrderId: string,
+    dto: SetAwaitingPartDto,
+    userId: string,
+    vehicleId: string,
+  ): Promise<AwaitingPartResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      // BE-17: update work order status to EN_ESPERA_DE_REPUESTO (RN-05).
+      await transaction.workOrder.update({
+        where: { id: workOrderId },
+        data: { status: 'EN_ESPERA_DE_REPUESTO' },
+      });
+
+      // RN-19: permanent, immutable technical history entry.
+      await transaction.technicalHistory.create({
+        data: {
+          vehicleId,
+          description:
+            `Work order set to AWAITING_PART. Missing spare part id: ${dto.missingPartId}, quantity: ${dto.quantity}. Reason: ${dto.reason}`,
+        },
+      });
+
+      // US-13: register an inventory discrepancy for the workshop lead to
+      // audit the physical stock mismatch later.
+      const discrepancy = await transaction.inventoryDiscrepancy.create({
+        data: {
+          workOrderId,
+          sparePartId: dto.missingPartId,
+          reportedBy: userId,
+          quantity: dto.quantity,
+          reason: dto.reason,
+        },
+      });
+
+      return {
+        id: workOrderId,
+        status: 'EN_ESPERA_DE_REPUESTO',
+        missingPartId: dto.missingPartId,
+        quantity: dto.quantity,
+        reason: dto.reason,
+        createdAt: discrepancy.createdAt,
       };
     });
   }
