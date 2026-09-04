@@ -6,6 +6,9 @@ import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
+import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
+import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 
 @Injectable()
 export class WorkOrdersService {
