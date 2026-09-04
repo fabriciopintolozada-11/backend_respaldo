@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { CreateSparePartDto } from '../dto/create-spare-part.dto';
+import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../dto/create-inventory-adjustment.dto';
+import { InventoryAdjustmentResponseDto } from '../dto/inventory-adjustment-response.dto';
 import { QuerySparePartsDto } from '../dto/query-spare-parts.dto';
 
 // BE-08: PrismaService is only injected inside repositories.
@@ -80,6 +82,82 @@ export class SparePartRepository {
 
   deactivate(id: string) {
     return this.prisma.sparePart.update({ where: { id }, data: { isActive: false }, select: this.selectPublicFields() });
+  }
+
+  // US-14 / BE-16 / BE-17 / RN-07: atomically adjust physical stock and record
+  // the movement in the immutable kardex. A NEGATIVE adjustment that would
+  // leave physicalStock below reservedStock is rejected at the database level.
+  createAdjustment(
+    sparePartId: string,
+    dto: CreateInventoryAdjustmentDto,
+    userId: string,
+  ): Promise<InventoryAdjustmentResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const part = await tx.sparePart.findUnique({ where: { id: sparePartId } });
+      if (!part) throw new UnprocessableEntityException('Spare part not found or inactive');
+
+      const delta = dto.type === InventoryAdjustmentType.POSITIVE ? dto.quantity : -dto.quantity;
+      const newPhysicalStock = part.physicalStock + delta;
+
+      // RN-07: physical stock must never drop below reserved stock.
+      if (newPhysicalStock < 0 || newPhysicalStock < part.reservedStock) {
+        throw new UnprocessableEntityException(
+          `RN-07: adjustment would result in physicalStock (${newPhysicalStock}) below reservedStock (${part.reservedStock})`,
+        );
+      }
+
+      const updated = await tx.sparePart.update({
+        where: { id: sparePartId },
+        data: {
+          physicalStock: newPhysicalStock,
+          lastMovementAt: new Date(),
+        },
+        select: this.selectPublicFields(),
+      });
+
+      // BE-17: immutable kardex record. Insert-only, never updated or deleted.
+      await tx.stockMovement.create({
+        data: {
+          sparePartId,
+          userId,
+          quantity: dto.quantity,
+          type: 'ADJUSTMENT',
+          reason: dto.reason,
+          previousPhysicalStock: part.physicalStock,
+          newPhysicalStock,
+        },
+      });
+
+      // US-13 integration: if the adjustment resolves a reported discrepancy,
+      // mark it as resolved within the same transaction.
+      if (dto.inventoryDiscrepancyId) {
+        const discrepancy = await tx.inventoryDiscrepancy.findUnique({
+          where: { id: dto.inventoryDiscrepancyId },
+        });
+        if (!discrepancy || discrepancy.sparePartId !== sparePartId || discrepancy.status !== 'PENDING') {
+          throw new UnprocessableEntityException(
+            'inventoryDiscrepancyId does not exist, does not belong to this spare part, or is already resolved',
+          );
+        }
+        await tx.inventoryDiscrepancy.update({
+          where: { id: dto.inventoryDiscrepancyId },
+          data: { status: 'RESOLVED', resolvedBy: userId, resolvedAt: new Date() },
+        });
+      }
+
+      return {
+        id: updated.id,
+        code: updated.code,
+        name: updated.name,
+        category: updated.category as InventoryAdjustmentResponseDto['category'],
+        physicalStock: updated.physicalStock,
+        availableStock: updated.physicalStock - updated.reservedStock,
+        reservedStock: updated.reservedStock,
+        unitPrice: updated.unitPrice.toString(),
+        lastMovementAt: updated.lastMovementAt,
+        isActive: updated.isActive,
+      };
+    });
   }
 
   private selectPublicFields(): Prisma.SparePartSelect {
