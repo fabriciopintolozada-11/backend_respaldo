@@ -8,6 +8,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { AssignedOrdersService } from './assigned-orders.service';
 import { QueryAssignedWorkOrdersDto } from './dto/query-assigned-work-orders.dto';
 import { ListAssignedWorkOrdersResponseDto } from './dto/list-assigned-work-orders.response.dto';
+import { AssignedWorkOrderDetailResponseDto } from './dto/assigned-work-order.response.dto';
 
 // BE-29: only the MECHANIC role can list their own assigned work orders
 // (RN-04, RN-16). The mechanic id comes from the authenticated user (BE-19).
@@ -31,10 +32,10 @@ export class AssignedOrdersController {
   }
 
   @Get('assigned/:id')
-  @ApiOperation({ summary: 'Get an assigned work order technical detail (US-03)' })
-  @ApiResponse({ status: 200 })
+  @ApiOperation({ summary: 'Get an assigned work order technical detail (US-03, HU-07), including reserved spare parts' })
+  @ApiResponse({ status: 200, type: AssignedWorkOrderDetailResponseDto })
   @ApiResponse({ status: 404, description: 'The work order is not assigned to this mechanic' })
-  getAssignedDetail(@Req() request: Request, @Param('id', ParseUUIDPipe) id: string) {
+  getAssignedDetail(@Req() request: Request, @Param('id', ParseUUIDPipe) id: string): Promise<AssignedWorkOrderDetailResponseDto> {
     return this.service.getAssignedDetail(request.user.id, id);
   }
 }
