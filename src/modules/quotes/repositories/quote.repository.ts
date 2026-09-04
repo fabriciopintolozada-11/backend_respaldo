@@ -6,6 +6,7 @@ import { ApproveQuoteDto } from '../dto/approve-quote.dto';
 import { RejectQuoteDto } from '../dto/reject-quote.dto';
 import { QuoteDecision, QuoteDecisionResponseDto } from '../dto/quote-decision-response.dto';
 import { QuoteResponseDto } from '../dto/quote-response.dto';
+import { QuoteApprovalDetailResponseDto } from '../dto/quote-approval-query-response.dto';
 
 @Injectable()
 export class QuoteRepository {
@@ -77,6 +78,112 @@ export class QuoteRepository {
       }
     }
     return result;
+  }
+
+  findApprovalPage(page: number, pageSize: number) {
+    return this.prisma.quote.findMany({
+      where: { workOrder: { status: 'PRESUPUESTO_ENVIADO' } },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        workOrderId: true,
+        total: true,
+        workOrder: {
+          select: {
+            status: true,
+            vehicle: { select: { plate: true, brand: true, model: true, year: true, isFullyElectric: true } },
+            customer: { select: { name: true } },
+          },
+        },
+      },
+    }).then((rows) => rows.map((row) => ({
+      workOrderId: row.workOrderId,
+      orderCode: null,
+      vehiclePlate: row.workOrder.vehicle.plate,
+      vehicleBrand: row.workOrder.vehicle.brand,
+      vehicleModel: row.workOrder.vehicle.model,
+      vehicleYear: row.workOrder.vehicle.year,
+      clientName: row.workOrder.customer.name,
+      total: row.total.toString(),
+      status: row.workOrder.status,
+      isFullyElectric: row.workOrder.vehicle.isFullyElectric,
+    })));
+  }
+
+  countApprovalQuotes(): Promise<number> {
+    return this.prisma.quote.count({ where: { workOrder: { status: 'PRESUPUESTO_ENVIADO' } } });
+  }
+
+  async findApprovalDetail(workOrderId: string): Promise<QuoteApprovalDetailResponseDto | null> {
+    const quote = await this.prisma.quote.findFirst({
+      where: { workOrderId, workOrder: { status: 'PRESUPUESTO_ENVIADO' } },
+      select: {
+        id: true,
+        workOrderId: true,
+        total: true,
+        laborSubtotal: true,
+        partsSubtotal: true,
+        currency: true,
+        createdAt: true,
+        details: { orderBy: { id: 'asc' } },
+        parts: { orderBy: { id: 'asc' }, select: { status: true, sparePart: { select: { code: true } } } },
+        workOrder: {
+          select: {
+            id: true,
+            status: true,
+            initialComplaint: true,
+            createdAt: true,
+            vehicle: { select: { plate: true, brand: true, model: true, year: true, isFullyElectric: true } },
+            customer: { select: { name: true, identification: true, phone: true } },
+          },
+        },
+      },
+    });
+    if (!quote) return null;
+
+    let partIndex = 0;
+    return {
+      quoteId: quote.id,
+      workOrderId: quote.workOrderId,
+      workOrder: {
+        id: quote.workOrder.id,
+        status: quote.workOrder.status,
+        vehiclePlate: quote.workOrder.vehicle.plate,
+        vehicleBrand: quote.workOrder.vehicle.brand,
+        vehicleModel: quote.workOrder.vehicle.model,
+        vehicleYear: quote.workOrder.vehicle.year,
+        clientName: quote.workOrder.customer.name,
+        clientDocument: quote.workOrder.customer.identification,
+        clientPhone: quote.workOrder.customer.phone,
+        entryReason: quote.workOrder.initialComplaint,
+        createdAt: quote.workOrder.createdAt,
+      },
+      budget: {
+        id: quote.id,
+        workOrderId: quote.workOrderId,
+        total: quote.total.toString(),
+        laborSubtotal: quote.laborSubtotal?.toString() ?? '0',
+        partsSubtotal: quote.partsSubtotal?.toString() ?? '0',
+        currency: quote.currency,
+        status: quote.workOrder.status,
+        createdAt: quote.createdAt,
+      },
+      items: quote.details.map((item) => {
+        const part = item.itemType === 'PART' ? quote.parts[partIndex++] : undefined;
+        return {
+          id: item.id,
+          description: item.description,
+          itemType: item.itemType as QuoteItemType,
+          quantity: item.quantity.toString(),
+          unitPrice: item.unitPrice.toString(),
+          subtotal: item.subtotal.toString(),
+          status: part?.status ?? 'PROPOSED',
+          ...(part?.sparePart.code ? { code: part.sparePart.code } : {}),
+        };
+      }),
+      isFullyElectric: quote.workOrder.vehicle.isFullyElectric,
+    };
   }
 
   approve(workOrderId: string, dto: ApproveQuoteDto, recordedBy: string): Promise<QuoteDecisionResponseDto> {

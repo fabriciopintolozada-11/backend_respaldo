@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { QuotesController } from './quotes.controller';
+import { QuoteApprovalQueryController } from './quote-approval-query.controller';
 import { QuotesService } from './quotes.service';
 import { QuoteRepository } from './repositories/quote.repository';
 
-@Module({ controllers: [QuotesController], providers: [QuotesService, QuoteRepository] })
+@Module({ controllers: [QuotesController, QuoteApprovalQueryController], providers: [QuotesService, QuoteRepository] })
 export class QuotesModule {}
