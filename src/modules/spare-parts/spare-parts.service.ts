@@ -4,6 +4,8 @@ import { SparePartResponseDto } from './dto/spare-part.response.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateSparePartDto } from './dto/create-spare-part.dto';
+import { CreateInventoryAdjustmentDto } from './dto/create-inventory-adjustment.dto';
+import { InventoryAdjustmentResponseDto } from './dto/inventory-adjustment-response.dto';
 import { QuerySparePartsDto } from './dto/query-spare-parts.dto';
 import { ListSparePartsResponseDto } from './dto/list-spare-parts.response.dto';
 
@@ -40,6 +42,18 @@ export class SparePartsService {
       throw new ConflictException('Spare part has pending reservations');
     }
     return this.toResponse(await this.repository.deactivate(id), UserRole.ADMIN);
+  }
+
+  // US-14: register a physical inventory adjustment. The service validates
+  // that the spare part exists before delegating to the repository transaction.
+  async createAdjustment(
+    dto: CreateInventoryAdjustmentDto,
+    userId: string,
+    role: string,
+  ): Promise<InventoryAdjustmentResponseDto> {
+    const existing = await this.repository.findById(dto.sparePartId);
+    if (!existing) throw new NotFoundException('Spare part not found');
+    return this.repository.createAdjustment(dto.sparePartId, dto, userId);
   }
 
   private toResponse(part: {
