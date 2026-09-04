@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '../../../generated/prisma/client';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
@@ -37,7 +38,20 @@ export class WorkOrderRepository {
 
   // HU-12: the advisor (WORKSHOP_LEAD / RECEPTIONIST) reads the diagnostic of a
   // work order before building a quote. Non-financial allowlist only (RN-16).
-  findDiagnostic(workOrderId: string) {
+  findDiagnostic(workOrderId: string): Promise<{
+    id: string;
+    status: string;
+    vehicleId: string;
+    diagnostic: {
+      id: string;
+      workOrderId: string;
+      description: string;
+      suggestedTasks: Prisma.JsonValue;
+      suggestedPartIds: Prisma.JsonValue;
+      estimatedHours: Prisma.Decimal;
+      createdAt: Date;
+    } | null;
+  } | null> {
     return this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
       select: {
@@ -296,6 +310,7 @@ export class WorkOrderRepository {
         data: {
           physicalStock: { decrement: dto.quantity },
           reservedStock: { decrement: dto.quantity },
+          lastMovementAt: new Date(),
         },
       });
       if (stockUpdate.count !== 1) {

@@ -13,7 +13,7 @@ describe('QuotesService approval queries', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new QuotesService(repository as never);
+    service = new QuotesService(repository as never, {} as never);
   });
 
   it('returns a paginated approval list', async () => {
