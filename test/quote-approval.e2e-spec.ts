@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { CanActivate, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 import request from 'supertest';
@@ -30,7 +31,12 @@ describe('Quote approval endpoints (e2e) — US-09', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [QuotesController],
-      providers: [QuotesService, RolesGuard, { provide: QuoteRepository, useValue: repository }],
+      providers: [
+        QuotesService,
+        RolesGuard,
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: QuoteRepository, useValue: repository },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useClass(TestAuthGuard)
