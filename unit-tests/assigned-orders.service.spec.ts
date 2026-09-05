@@ -6,6 +6,7 @@ describe('AssignedOrdersService (US-03)', () => {
   let service: AssignedOrdersService;
   const repository = {
     findAssignedToMechanic: jest.fn(),
+    findAssignedDetail: jest.fn(),
     countAssignedToMechanic: jest.fn(),
   };
 
@@ -16,6 +17,21 @@ describe('AssignedOrdersService (US-03)', () => {
     initialComplaint: 'No arranca',
     assignedAt: new Date('2026-08-02T10:00:00Z'),
     vehicle: { plate: '1234ABC' },
+    quote: null,
+  };
+
+  const approvedQuote = {
+    id: 'quote-1',
+    approvals: [{ decision: 'APPROVED' }],
+    parts: [
+      {
+        id: 'quote-part-1',
+        sparePartId: 'spare-1',
+        quantity: 2,
+        status: 'RESERVED',
+        sparePart: { id: 'spare-1', code: 'FRE-001', name: 'Pastillas de freno' },
+      },
+    ],
   };
 
   beforeEach(async () => {
@@ -63,5 +79,69 @@ describe('AssignedOrdersService (US-03)', () => {
     expect(repository.findAssignedToMechanic).toHaveBeenCalledWith('mechanic-1', 1, 20);
     expect(result.data).toEqual([]);
     expect(result.total).toBe(0);
+  });
+
+  it('exposes the approved quote parts so the modal can read missingPartId (HU-13)', async () => {
+    repository.findAssignedToMechanic.mockResolvedValue([{ ...assignedRow, quote: approvedQuote }]);
+    repository.countAssignedToMechanic.mockResolvedValue(1);
+
+    const result = await service.getAssigned('mechanic-1', {});
+
+    expect(result.data[0].quote).toEqual({
+      id: 'quote-1',
+      parts: [
+        {
+          id: 'quote-part-1',
+          sparePartId: 'spare-1',
+          quantity: 2,
+          status: 'RESERVED',
+          sparePart: { id: 'spare-1', code: 'FRE-001', name: 'Pastillas de freno' },
+        },
+      ],
+    });
+  });
+
+  it('hides the quote when it has not been approved by the customer (HU-13)', async () => {
+    repository.findAssignedToMechanic.mockResolvedValue([
+      { ...assignedRow, quote: { id: 'quote-1', approvals: [{ decision: 'REJECTED' }], parts: [] } },
+    ]);
+    repository.countAssignedToMechanic.mockResolvedValue(1);
+
+    const result = await service.getAssigned('mechanic-1', {});
+
+    expect(result.data[0].quote).toBeNull();
+  });
+
+  it('exposes the approved quote on the detail endpoint (HU-13)', async () => {
+    repository.findAssignedDetail.mockResolvedValue({
+      ...assignedRow,
+      vehicle: { plate: '1234ABC', brand: 'Toyota', model: 'Corolla', year: 2020 },
+      quote: approvedQuote,
+    });
+
+    const detail = await service.getAssignedDetail('mechanic-1', 'wo-1');
+
+    expect(detail.quote).toEqual({
+      id: 'quote-1',
+      parts: [
+        {
+          id: 'quote-part-1',
+          sparePartId: 'spare-1',
+          quantity: 2,
+          status: 'RESERVED',
+          sparePart: { id: 'spare-1', code: 'FRE-001', name: 'Pastillas de freno' },
+        },
+      ],
+    });
+    expect(JSON.stringify(detail)).not.toMatch(/price|cost|amount|rate/i);
+  });
+
+  it('never exposes cost, price or subtotal of the quote parts (RN-16)', async () => {
+    repository.findAssignedToMechanic.mockResolvedValue([{ ...assignedRow, quote: approvedQuote }]);
+    repository.countAssignedToMechanic.mockResolvedValue(1);
+
+    const result = await service.getAssigned('mechanic-1', {});
+
+    expect(JSON.stringify(result)).not.toMatch(/price|cost|totalAmount|rate|subtotal|partsSubtotal|unitPrice/i);
   });
 });
