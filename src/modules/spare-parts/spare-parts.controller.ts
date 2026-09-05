@@ -71,6 +71,6 @@ export class SparePartsController {
     @Body() dto: CreateInventoryAdjustmentDto,
     @Req() request: Request,
   ): Promise<InventoryAdjustmentResponseDto> {
-    return this.service.createAdjustment(dto, request.user.id, request.user.role);
+    return this.service.createAdjustment(dto, request.user.id);
   }
 }

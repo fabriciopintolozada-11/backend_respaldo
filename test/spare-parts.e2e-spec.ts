@@ -11,10 +11,12 @@ describe('SparePartsController (e2e) - HU-23', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let partId: string;
+  let alertPartId: string;
   let leadAuthorization: string;
   let mechanicAuthorization: string;
   let receptionistAuthorization: string;
   const code = `E2E-${Date.now()}`;
+  const alertCode = `${code}-ALERT`;
   const leadId = '00000000-0000-4000-8000-000000000040';
   const mechanicId = '11111111-1111-4111-8111-111111111111';
   const receptionistId = '00000000-0000-4000-8000-000000000010';
@@ -37,6 +39,10 @@ describe('SparePartsController (e2e) - HU-23', () => {
     if (partId) {
       await prisma.stockMovement.deleteMany({ where: { sparePartId: partId } });
       await prisma.sparePart.delete({ where: { id: partId } });
+    }
+    if (alertPartId) {
+      await prisma.stockMovement.deleteMany({ where: { sparePartId: alertPartId } });
+      await prisma.sparePart.delete({ where: { id: alertPartId } });
     }
     await app.close();
   });
@@ -78,5 +84,35 @@ describe('SparePartsController (e2e) - HU-23', () => {
 
     const stored = await prisma.sparePart.findUnique({ where: { id: partId } });
     expect(stored?.isActive).toBe(false);
+  });
+
+  it('reports an STOCK_OUT alert to the lead and hides the endpoint from mechanics (HU-08, RN-10)', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/spare-parts')
+      .set('Authorization', leadAuthorization)
+      .send({ code: alertCode, name: 'Repuesto sin stock E2E', category: 'MOTOR', unitPrice: 80, initialStock: 0 })
+      .expect(201);
+
+    alertPartId = created.body.id as string;
+    expect(alertPartId).toBeDefined();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/inventory/alerts')
+      .set('Authorization', mechanicAuthorization)
+      .expect(403);
+
+    const alerts = await request(app.getHttpServer())
+      .get(`/api/v1/inventory/alerts?search=${alertCode}&page=1&pageSize=10`)
+      .set('Authorization', leadAuthorization)
+      .expect(200);
+
+    expect(alerts.body).toMatchObject({ page: 1, pageSize: 10 });
+    const alert = alerts.body.data.find((item: { partId: string }) => item.partId === alertPartId);
+    expect(alert).toBeDefined();
+    expect(alert).toMatchObject({
+      alertType: 'STOCK_OUT',
+      physicalStock: 0,
+      availableStock: 0,
+    });
   });
 });

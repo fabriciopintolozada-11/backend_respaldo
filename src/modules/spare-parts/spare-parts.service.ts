@@ -8,6 +8,10 @@ import { CreateInventoryAdjustmentDto } from './dto/create-inventory-adjustment.
 import { InventoryAdjustmentResponseDto } from './dto/inventory-adjustment-response.dto';
 import { QuerySparePartsDto } from './dto/query-spare-parts.dto';
 import { ListSparePartsResponseDto } from './dto/list-spare-parts.response.dto';
+import { QueryInventoryAlertsDto } from './dto/query-inventory-alerts.dto';
+import { InventoryAlertResponseDto } from './dto/inventory-alert.response.dto';
+import { InventoryAlertType } from './dto/inventory-alert-type.enum';
+import { ListInventoryAlertsResponseDto } from './dto/list-inventory-alerts.response.dto';
 
 // BE-12.3 (HU-12): catalog lookups used to build quotes with official prices
 // enforced by the backend (BE-12.5).
@@ -31,6 +35,20 @@ export class SparePartsService {
     return this.toResponse(part, role);
   }
 
+  async findAlerts(query: QueryInventoryAlertsDto): Promise<ListInventoryAlertsResponseDto> {
+    const now = new Date();
+    const rotationCutoff = new Date(now);
+    rotationCutoff.setUTCDate(rotationCutoff.getUTCDate() - 60);
+    const result = await this.repository.findInventoryAlerts(query, rotationCutoff);
+
+    return {
+      data: result.data.map((part) => this.toAlertResponse(part, now, query.alertType)),
+      total: result.total,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
+    };
+  }
+
   async create(dto: CreateSparePartDto, userId: string): Promise<SparePartResponseDto> {
     return this.toResponse(await this.repository.create(dto, userId), UserRole.ADMIN);
   }
@@ -49,7 +67,6 @@ export class SparePartsService {
   async createAdjustment(
     dto: CreateInventoryAdjustmentDto,
     userId: string,
-    role: string,
   ): Promise<InventoryAdjustmentResponseDto> {
     const existing = await this.repository.findById(dto.sparePartId);
     if (!existing) throw new NotFoundException('Spare part not found');
@@ -79,6 +96,40 @@ export class SparePartsService {
       ...(role === UserRole.MECHANIC ? {} : { unitPrice: part.unitPrice.toString() }),
       lastMovementAt: part.lastMovementAt,
       isActive: part.isActive,
+    };
+  }
+
+  private toAlertResponse(
+    part: {
+      id: string;
+      code: string;
+      name: string;
+      category: string;
+      physicalStock: number;
+      reservedStock: number;
+      lastMovementAt: Date | null;
+    },
+    now: Date,
+    alertType?: InventoryAlertType,
+  ): InventoryAlertResponseDto {
+    const availableStock = part.physicalStock - part.reservedStock;
+    const daysWithoutMovement = part.lastMovementAt
+      ? Math.max(0, Math.floor((now.getTime() - part.lastMovementAt.getTime()) / 86_400_000))
+      : 0;
+    const resolvedAlertType =
+      alertType ?? (availableStock <= 0 ? InventoryAlertType.STOCK_OUT : InventoryAlertType.NO_ROTATION);
+
+    return {
+      partId: part.id,
+      code: part.code,
+      name: part.name,
+      category: part.category as InventoryAlertResponseDto['category'],
+      physicalStock: part.physicalStock,
+      reservedStock: part.reservedStock,
+      availableStock,
+      daysWithoutMovement,
+      alertType: resolvedAlertType,
+      lastMovementAt: part.lastMovementAt,
     };
   }
 }
