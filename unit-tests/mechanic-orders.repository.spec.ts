@@ -12,6 +12,7 @@ describe('MechanicOrdersRepository (HU-03)', () => {
     initialComplaint: 'No arranca',
     assignedAt: new Date('2026-08-02T10:00:00Z'),
     vehicle: { plate: '1234ABC' },
+    quote: null,
   };
 
   beforeEach(() => {
@@ -52,7 +53,13 @@ describe('MechanicOrdersRepository (HU-03)', () => {
 
     const select = prisma.workOrder.findMany.mock.calls[0][0].select;
     expect(Object.keys(select).sort()).toEqual(
-      ['assignedAt', 'id', 'initialComplaint', 'status', 'vehicleId', 'vehicle'].sort(),
+      ['assignedAt', 'id', 'initialComplaint', 'quote', 'status', 'vehicleId', 'vehicle'].sort(),
+    );
+    expect(select.quote.select.parts.select.sparePart.select).toEqual(
+      expect.objectContaining({ code: true, name: true }),
+    );
+    expect(select.quote.select.parts.select).toEqual(
+      expect.objectContaining({ sparePartId: true, quantity: true, status: true }),
     );
     const serialized = JSON.stringify(select);
     expect(serialized).not.toMatch(/price|cost|amount|rate|total/i);
