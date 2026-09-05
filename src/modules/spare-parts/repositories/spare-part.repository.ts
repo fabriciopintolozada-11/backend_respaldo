@@ -5,6 +5,8 @@ import { CreateSparePartDto } from '../dto/create-spare-part.dto';
 import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../dto/create-inventory-adjustment.dto';
 import { InventoryAdjustmentResponseDto } from '../dto/inventory-adjustment-response.dto';
 import { QuerySparePartsDto } from '../dto/query-spare-parts.dto';
+import { InventoryAlertType } from '../dto/inventory-alert-type.enum';
+import { QueryInventoryAlertsDto } from '../dto/query-inventory-alerts.dto';
 
 // BE-08: PrismaService is only injected inside repositories.
 @Injectable()
@@ -35,6 +37,60 @@ export class SparePartRepository {
         ...(search ? { OR: [{ code: { contains: search, mode: 'insensitive' } }, { name: { contains: search, mode: 'insensitive' } }] } : {}),
       },
     });
+  }
+
+  async findInventoryAlerts(
+    query: QueryInventoryAlertsDto,
+    rotationCutoff: Date,
+  ): Promise<{ data: InventoryAlertCandidate[]; total: number }> {
+    const filters = [Prisma.sql`sp.is_active = true`];
+    const search = query.search?.trim();
+
+    if (search) {
+      filters.push(Prisma.sql`(sp.code ILIKE ${`%${search}%`} OR sp.name ILIKE ${`%${search}%`})`);
+    }
+
+    if (query.alertType === InventoryAlertType.NO_ROTATION) {
+      filters.push(Prisma.sql`sp.physical_stock > 0 AND sp.last_movement_at <= ${rotationCutoff}`);
+    } else if (query.alertType === InventoryAlertType.STOCK_OUT) {
+      filters.push(Prisma.sql`sp.physical_stock - sp.reserved_stock <= 0`);
+    } else {
+      filters.push(
+        Prisma.sql`(sp.physical_stock > 0 AND sp.last_movement_at <= ${rotationCutoff} OR sp.physical_stock - sp.reserved_stock <= 0)`,
+      );
+    }
+
+    if (query.category) {
+      filters.push(Prisma.sql`sp.category = ${query.category}`);
+    }
+
+    const where = Prisma.join(filters, ' AND ');
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
+    const [data, countRows] = await Promise.all([
+      this.prisma.$queryRaw<InventoryAlertCandidate[]>(Prisma.sql`
+        SELECT
+          sp.id,
+          sp.code,
+          sp.name,
+          sp.category,
+          sp.physical_stock AS "physicalStock",
+          sp.reserved_stock AS "reservedStock",
+          sp.last_movement_at AS "lastMovementAt"
+        FROM spare_parts sp
+        WHERE ${where}
+        ORDER BY sp.name ASC, sp.code ASC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<[{ total: bigint }]>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS total
+        FROM spare_parts sp
+        WHERE ${where}
+      `),
+    ]);
+
+    return { data, total: Number(countRows[0]?.total ?? 0) };
   }
 
   findById(id: string) {
@@ -175,3 +231,13 @@ export class SparePartRepository {
     };
   }
 }
+
+export type InventoryAlertCandidate = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  physicalStock: number;
+  reservedStock: number;
+  lastMovementAt: Date | null;
+};

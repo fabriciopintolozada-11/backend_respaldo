@@ -3,7 +3,6 @@ import { validate } from 'class-validator';
 import { SparePartsService } from '../src/modules/spare-parts/spare-parts.service';
 import { SparePartRepository } from '../src/modules/spare-parts/repositories/spare-part.repository';
 import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../src/modules/spare-parts/dto/create-inventory-adjustment.dto';
-import { UserRole } from '../src/common/enums/user-role.enum';
 
 const SPARE_PART_ID = 'a1b2c3d4-e5f6-4890-abcd-ef1234567890';
 const USER_ID = 'b2c3d4e5-f6a7-4901-bcde-f12345678901';
@@ -55,25 +54,18 @@ describe('SparePartsService.createAdjustment (US-14)', () => {
         unitPrice: '120.00',
       } as never);
 
-      const result = await service.createAdjustment(baseDto, USER_ID, UserRole.WORKSHOP_LEAD);
+      const result = await service.createAdjustment(baseDto, USER_ID);
 
       expect(repository.findById).toHaveBeenCalledWith(SPARE_PART_ID);
       expect(repository.createAdjustment).toHaveBeenCalledWith(SPARE_PART_ID, baseDto, USER_ID);
       expect(result.physicalStock).toBe(15);
     });
 
-    it('allows WORKSHOP_LEAD to perform adjustments (RN-14)', async () => {
+    it('delegates adjustment without enforcing roles (RBAC stays in the controller guard)', async () => {
       repository.findById.mockResolvedValue(existingPart as never);
       repository.createAdjustment.mockResolvedValue(adjustedPart as never);
 
-      await expect(service.createAdjustment(baseDto, USER_ID, UserRole.WORKSHOP_LEAD)).resolves.toBeDefined();
-    });
-
-    it('allows ADMIN to perform adjustments', async () => {
-      repository.findById.mockResolvedValue(existingPart as never);
-      repository.createAdjustment.mockResolvedValue(adjustedPart as never);
-
-      await expect(service.createAdjustment(baseDto, USER_ID, UserRole.ADMIN)).resolves.toBeDefined();
+      await expect(service.createAdjustment(baseDto, USER_ID)).resolves.toBeDefined();
     });
 
     it('passes the discrepancy ID to the repository when provided', async () => {
@@ -81,7 +73,7 @@ describe('SparePartsService.createAdjustment (US-14)', () => {
       repository.createAdjustment.mockResolvedValue(adjustedPart as never);
       const dtoWithDiscrepancy = { ...baseDto, inventoryDiscrepancyId: DISCREPANCY_ID };
 
-      await service.createAdjustment(dtoWithDiscrepancy, USER_ID, UserRole.WORKSHOP_LEAD);
+      await service.createAdjustment(dtoWithDiscrepancy, USER_ID);
 
       expect(repository.createAdjustment).toHaveBeenCalledWith(SPARE_PART_ID, dtoWithDiscrepancy, USER_ID);
     });
@@ -92,7 +84,7 @@ describe('SparePartsService.createAdjustment (US-14)', () => {
       repository.findById.mockResolvedValue(null);
 
       await expect(
-        service.createAdjustment({ ...baseDto, sparePartId: 'nonexistent-uuid' }, USER_ID, UserRole.WORKSHOP_LEAD),
+        service.createAdjustment({ ...baseDto, sparePartId: 'nonexistent-uuid' }, USER_ID),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(repository.createAdjustment).not.toHaveBeenCalled();
     });
@@ -101,7 +93,7 @@ describe('SparePartsService.createAdjustment (US-14)', () => {
       repository.findById.mockResolvedValue(null); // findById filters isActive: true
 
       await expect(
-        service.createAdjustment(baseDto, USER_ID, UserRole.WORKSHOP_LEAD),
+        service.createAdjustment(baseDto, USER_ID),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
