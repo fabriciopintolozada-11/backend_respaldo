@@ -18,6 +18,18 @@ export interface AssignedQuoteRow {
   parts: AssignedQuotePartRow[];
 }
 
+// HU-07: detail row of an assigned work order. quote exposes the spare parts
+// of the approved quote (with sparePartId, HU-13) without financial fields.
+export interface AssignedWorkOrderDetailRow {
+  id: string;
+  vehicleId: string;
+  status: string;
+  initialComplaint: string;
+  assignedAt: Date | null;
+  vehicle: { plate: string; brand: string; model: string; year: number };
+  quote: AssignedQuoteRow | null;
+}
+
 export interface AssignedWorkOrderRow {
   id: string;
   vehicleId: string;
@@ -73,7 +85,10 @@ export class MechanicOrdersRepository {
     });
   }
 
-  findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderRow | null> {
+  // HU-07: returns the assigned work order detail together with the reserved
+  // spare part lines of its approved quote (RN-07). Only non-financial fields
+  // are selected so no price is ever exposed to a mechanic (RN-16 / BE-12).
+  findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailRow | null> {
     return this.prisma.workOrder.findFirst({
       where: { id: workOrderId, mechanicId },
       select: {

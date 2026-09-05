@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AssignedQuoteRow, AssignedWorkOrderRow, MechanicOrdersRepository } from './repositories/mechanic-orders.repository';
 import { ListAssignedWorkOrdersResponseDto } from './dto/list-assigned-work-orders.response.dto';
 import { QueryAssignedWorkOrdersDto } from './dto/query-assigned-work-orders.dto';
+import { AssignedWorkOrderDetailResponseDto, ReservedPartLineDto } from './dto/assigned-work-order.response.dto';
 
 @Injectable()
 export class AssignedOrdersService {
@@ -64,9 +65,23 @@ export class AssignedOrdersService {
     };
   }
 
-  async getAssignedDetail(mechanicId: string, workOrderId: string) {
+  // HU-07: returns the technical detail of an assigned work order alongside
+  // its reserved spare part lines (RN-07). The mechanic may only see the work
+  // orders explicitly assigned to them (RN-04). No price is mapped (RN-16).
+  async getAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailResponseDto> {
     const order = await this.repository.findAssignedDetail(mechanicId, workOrderId);
     if (!order) throw new NotFoundException('Assigned work order not found');
+
+    const reservedParts: ReservedPartLineDto[] = (order.quote?.parts ?? [])
+      .filter((p) => p.status === 'RESERVED' || p.status === 'INSTALLED')
+      .map((p) => ({
+        quotePartId: p.id,
+        code: p.sparePart.code,
+        name: p.sparePart.name,
+        quantityReserved: p.quantity,
+        quantityUsed: p.status === 'INSTALLED' ? p.quantity : 0,
+        status: p.status as 'RESERVED' | 'INSTALLED',
+      }));
     return {
       id: order.id,
       vehicleId: order.vehicleId,
@@ -81,6 +96,10 @@ export class AssignedOrdersService {
         year: order.vehicle.year,
       },
       quote: this.toApprovedQuote(order.quote),
+      brand: order.vehicle.brand,
+      model: order.vehicle.model,
+      year: order.vehicle.year,
+      reservedParts,
     };
   }
 }

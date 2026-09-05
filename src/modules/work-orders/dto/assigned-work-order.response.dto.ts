@@ -67,3 +67,59 @@ export class AssignedWorkOrderResponseDto {
   @ApiProperty({ description: 'Approved quote, or null when the order has no approved quote', type: AssignedQuoteResponseDto, nullable: true })
   quote!: AssignedQuoteResponseDto | null;
 }
+
+// HU-07 / RN-16: a reserved spare part line exposed to a mechanic. It carries
+// no financial fields. status uses the persistence values RESERVED / INSTALLED.
+export class ReservedPartLineDto {
+  @ApiProperty({ description: 'Quote part id, the identifier accepted by POST /work-orders/:id/consume-part' })
+  quotePartId!: string;
+
+  @ApiProperty({ description: 'Spare part catalog code' })
+  code!: string;
+
+  @ApiProperty({ description: 'Spare part name' })
+  name!: string;
+
+  @ApiProperty({ description: 'Reserved quantity' })
+  quantityReserved!: number;
+
+  @ApiProperty({ description: 'Quantity already installed and consumed' })
+  quantityUsed!: number;
+
+  @ApiProperty({ description: 'Quote part status', enum: ['RESERVED', 'INSTALLED'] })
+  status!: 'RESERVED' | 'INSTALLED';
+}
+
+// HU-07: detail of an assigned work order including its reserved spare parts
+// and the approved quote (HU-13). vehicle is nested to honor the HU-03 e2e
+// contract while brand/model/year stay flat for the HU-07 mechanic console.
+export class AssignedWorkOrderDetailResponseDto extends AssignedWorkOrderResponseDto {
+  @ApiProperty({ description: 'Vehicle data' })
+  vehicle!: {
+    plate: string;
+    brand: string;
+    model: string;
+    year: number;
+  };
+
+  @ApiProperty({
+    description: 'Vehicle brand',
+    nullable: true,
+  })
+  brand!: string;
+
+  @ApiProperty({
+    description: 'Vehicle model',
+    nullable: true,
+  })
+  model!: string;
+
+  @ApiProperty({
+    description: 'Vehicle model year',
+    nullable: true,
+  })
+  year!: number;
+
+  @ApiProperty({ type: [ReservedPartLineDto], description: 'Reserved spare parts of the approved quote (HU-07, RN-16)' })
+  reservedParts!: ReservedPartLineDto[];
+}
