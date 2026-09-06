@@ -120,16 +120,13 @@ export class WorkOrdersService {
 
     // RN-07: the requested part must belong to this order's approved quote and
     // be reserved exclusively for it.
-    const part = context.quote?.parts?.find((item) => item.id === dto.quotePartId);
+    const partId = dto.workOrderPartId ?? dto.quotePartId;
+    const part = context.quote?.parts?.find((item) => item.id === partId);
     if (!part || part.status !== 'RESERVED') {
       throw new UnprocessableEntityException('RN-07: spare part is not reserved for this work order');
     }
 
     // RN-01: never consume more than the reserved quantity.
-    if (dto.quantity > part.quantity) {
-      throw new UnprocessableEntityException('RN-01: quantity exceeds the reserved amount for the spare part');
-    }
-
     // HU-07: the first consumption of an approved order moves it to repair.
     const nextStatus = context.status === 'APROBADO' ? 'EN_REPARACION' : context.status;
 

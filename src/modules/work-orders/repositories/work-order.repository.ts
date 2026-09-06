@@ -291,7 +291,7 @@ export class WorkOrderRepository {
           quote: {
             select: {
               parts: {
-                where: { id: dto.quotePartId },
+                where: { id: dto.workOrderPartId ?? dto.quotePartId },
                 select: {
                   id: true,
                   sparePartId: true,
@@ -310,6 +310,15 @@ export class WorkOrderRepository {
       if (part.status !== 'RESERVED') {
         throw new UnprocessableEntityException('RN-07: spare part is not reserved for this work order');
       }
+      const consumed = await transaction.stockMovement.aggregate({
+        _sum: { quantity: true },
+        where: { workOrderId, sparePartId: part.sparePartId, type: 'OUT' },
+      });
+      const consumedQuantity = consumed._sum.quantity ?? 0;
+      const pendingQuantity = part.quantity - consumedQuantity;
+      if (dto.quantity > pendingQuantity) {
+        throw new UnprocessableEntityException('RN-01: quantity exceeds the reserved amount pending for the spare part');
+      }
       // RN-08 + RN-01: guarded atomic decrement of physical and reserved stock.
       // The update only matches when both stocks are sufficient, preventing a
       // negative balance at the database level.
@@ -322,16 +331,17 @@ export class WorkOrderRepository {
         data: {
           physicalStock: { decrement: dto.quantity },
           reservedStock: { decrement: dto.quantity },
+          availableStock: { decrement: dto.quantity },
           lastMovementAt: new Date(),
         },
       });
       if (stockUpdate.count !== 1) {
         throw new UnprocessableEntityException('RN-01: insufficient physical stock to consume the spare part');
       }
-      // RN-08: mark the piece as installed within the same transaction.
+      // Keep a partial reservation available until all reserved units are used.
       await transaction.quotePart.update({
         where: { id: part.id },
-        data: { status: 'INSTALLED' },
+        data: { status: dto.quantity === pendingQuantity ? 'INSTALLED' : 'RESERVED' },
       });
       // HU-07: first consumption of an approved order moves it to repair.
       if (nextStatus && nextStatus !== order.status) {
@@ -360,7 +370,7 @@ export class WorkOrderRepository {
         code: part.sparePart.code,
         name: part.sparePart.name,
         quantity: dto.quantity,
-        status: 'INSTALLED',
+         status: dto.quantity === pendingQuantity ? 'INSTALLED' : 'RESERVED',
       };
     });
   }
