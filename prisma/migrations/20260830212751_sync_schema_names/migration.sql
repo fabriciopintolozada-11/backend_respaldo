@@ -1,0 +1,1 @@
+-- No-op: schema normalization is handled by 20260824000000_sync_feature_first_schema.

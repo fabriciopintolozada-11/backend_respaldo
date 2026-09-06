@@ -60,7 +60,7 @@ describe('VehicleStatusController (e2e) — US-02', () => {
 
   it('GET /api/v1/public/vehicle-status returns 404 for an unknown work order without leaking data', async () => {
     const response = await request(app.getHttpServer())
-      .get('/api/v1/public/vehicle-status?plate=ZZZ999&customerIdentification=0000000')
+      .get('/api/v1/public/vehicle-status?plate=ZZZ999&identification=0000000')
       .expect(404);
 
     expect(response.body.message).toBe('No valid work order found for the provided data');
@@ -68,7 +68,7 @@ describe('VehicleStatusController (e2e) — US-02', () => {
 
   it('GET /api/v1/public/vehicle-status rejects a valid plate with an incorrect document', async () => {
     await request(app.getHttpServer())
-      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=INCORRECTO`)
+      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&identification=INCORRECTO`)
       .expect(404);
   });
 
@@ -77,7 +77,7 @@ describe('VehicleStatusController (e2e) — US-02', () => {
     await prisma.workOrder.update({ where: { id: finalizedWorkOrderId }, data: { status: 'CERRADA' } });
 
     const response = await request(app.getHttpServer())
-      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=${testIdentification}`)
+      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&identification=${testIdentification}`)
       .expect(200);
 
     expect(response.body.stage).toBe('En reparación');
@@ -88,7 +88,7 @@ describe('VehicleStatusController (e2e) — US-02', () => {
     await prisma.workOrder.update({ where: { id: finalizedWorkOrderId }, data: { status: 'FINALIZADO' } });
 
     const response = await request(app.getHttpServer())
-      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&customerIdentification=${testIdentification}`)
+      .get(`/api/v1/public/vehicle-status?plate=${testPlate}&identification=${testIdentification}`)
       .expect(200);
 
     expect(response.body.stage).toBe('Finalizado');

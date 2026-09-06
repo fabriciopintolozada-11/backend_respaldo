@@ -21,9 +21,6 @@ END $$;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'identification') THEN
-    NULL;
-  END IF;
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'customerId') THEN
     ALTER TABLE vehicles RENAME COLUMN "customerId" TO customer_id;
   END IF;

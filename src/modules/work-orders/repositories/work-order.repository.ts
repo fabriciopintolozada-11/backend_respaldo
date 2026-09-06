@@ -1,33 +1,174 @@
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '../../../generated/prisma/client';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
+import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
+import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
+import { ConsumeSparePartDto } from '../dto/consume-spare-part.dto';
+import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
+import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
+import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 
-export interface VehicleHistoryRecord {
+export interface AvailableWorkOrderRow {
+  id: string;
+  vehicleId: string;
   plate: string;
-  brand: string;
-  model: string;
-  year: number;
-  technicalHistory: Array<{ description: string; createdAt: Date }>;
-  workOrders: Array<{ id: string; status: string; createdAt: Date; updatedAt: Date }>;
+  vehicleBrand: string;
+  vehicleModel: string;
+  vehicleYear: number;
+  customerName: string;
+  customerIdentification: string;
+  initialComplaint: string;
+  status: string;
+  createdAt: Date;
+  mechanicId: string | null;
+}
+
+export interface ActiveMechanicRow {
+  id: string;
+  isActive: boolean;
+  name: string | null;
 }
 
 @Injectable()
 export class WorkOrderRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findVehicleHistory(plate: string): Promise<VehicleHistoryRecord> {
+  findAssignedWorkOrder(id: string, mechanicId: string) {
+    return this.prisma.workOrder.findFirst({ where: { id, mechanicId }, select: { status: true } });
+  }
+
+  // HU-12: the advisor (WORKSHOP_LEAD / RECEPTIONIST) reads the diagnostic of a
+  // work order before building a quote. Non-financial allowlist only (RN-16).
+  findDiagnostic(workOrderId: string): Promise<{
+    id: string;
+    status: string;
+    vehicleId: string;
+    diagnostic: {
+      id: string;
+      workOrderId: string;
+      description: string;
+      suggestedTasks: Prisma.JsonValue;
+      suggestedPartIds: Prisma.JsonValue;
+      estimatedHours: Prisma.Decimal;
+      createdAt: Date;
+    } | null;
+  } | null> {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        diagnostic: {
+          select: {
+            id: true,
+            workOrderId: true,
+            description: true,
+            suggestedTasks: true,
+            suggestedPartIds: true,
+            estimatedHours: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  // HU-12: list work orders awaiting a quote (EN_DIAGNOSTICO). No monetary
+  // fields are exposed to the advisor list (RN-16).
+  findPendingQuoteOrders() {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'EN_DIAGNOSTICO' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        initialComplaint: true,
+        createdAt: true,
+        vehicle: { select: { plate: true, brand: true, model: true, year: true } },
+        customer: { select: { name: true, identification: true } },
+      },
+    });
+  }
+
+  findAvailable(page: number, pageSize: number): Promise<AvailableWorkOrderRow[]> {
+    return this.prisma.workOrder.findMany({
+      where: { status: 'RECIBIDO', mechanicId: null },
+      orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        vehicleId: true,
+        status: true,
+        initialComplaint: true,
+        createdAt: true,
+        mechanicId: true,
+        vehicle: {
+          select: {
+            plate: true,
+            brand: true,
+            model: true,
+            year: true,
+            customer: { select: { name: true, identification: true } },
+          },
+        },
+      },
+    }).then((rows) => rows.map((row) => ({
+      id: row.id,
+      vehicleId: row.vehicleId,
+      plate: row.vehicle.plate,
+      vehicleBrand: row.vehicle.brand,
+      vehicleModel: row.vehicle.model,
+      vehicleYear: row.vehicle.year,
+      customerName: row.vehicle.customer.name,
+      customerIdentification: row.vehicle.customer.identification,
+      initialComplaint: row.initialComplaint,
+      status: row.status,
+      createdAt: row.createdAt,
+      mechanicId: row.mechanicId,
+    })));
+  }
+
+  countAvailable(): Promise<number> {
+    return this.prisma.workOrder.count({ where: { status: 'RECIBIDO', mechanicId: null } });
+  }
+
+  async findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
+    const mechanics = await this.prisma.mechanic.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: { id: true, isActive: true },
+    });
+    if (mechanics.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: mechanics.map((m) => m.id) } },
+      select: { id: true, fullName: true },
+    });
+    const nameByUserId = new Map(users.map((u) => [u.id, u.fullName]));
+
+    return mechanics.map((m) => ({ ...m, name: nameByUserId.get(m.id) ?? null }));
+  }
+
+  countActiveMechanics(): Promise<number> {
+    return this.prisma.mechanic.count({ where: { isActive: true } });
+  }
+
+  async findVehicleHistory(plate: string) {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { plate },
-      select: {
-        plate: true,
-        brand: true,
-        model: true,
-        year: true,
+      include: {
+        customer: true,
         technicalHistory: { orderBy: { createdAt: 'desc' } },
         workOrders: {
           orderBy: { createdAt: 'desc' },
-          select: { id: true, status: true, createdAt: true, updatedAt: true },
+          include: { mechanic: true },
         },
       },
     });
@@ -42,32 +183,13 @@ export class WorkOrderRepository {
         update: { name: dto.customer.name, phone: dto.customer.phone },
         create: { identification: dto.customer.identification, name: dto.customer.name, phone: dto.customer.phone },
       });
-      const existingVehicle = await transaction.vehicle.findUnique({ where: { plate: dto.plate } });
-      if (existingVehicle && existingVehicle.customerId !== customer.id) {
-        throw new ConflictException('La placa ya se encuentra registrada a nombre de otro cliente');
-      }
-
-      const vehicle = existingVehicle
-        ? await transaction.vehicle.update({
-            where: { id: existingVehicle.id },
-            data: { brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year },
-          })
-        : await transaction.vehicle.create({
-            data: {
-              customerId: customer.id,
-              plate: dto.plate,
-              brand: dto.vehicle.brand,
-              model: dto.vehicle.model,
-              year: dto.vehicle.year,
-              isFullyElectric: dto.vehicle.isFullyElectric,
-            },
-          });
-
-      if (vehicle.isFullyElectric) {
-        throw new UnprocessableEntityException('Los vehículos 100% eléctricos no son aceptados');
-      }
+      const vehicle = await transaction.vehicle.upsert({
+        where: { plate: dto.plate },
+        update: { brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year },
+        create: { customerId: customer.id, plate: dto.plate, brand: dto.vehicle.brand, model: dto.vehicle.model, year: dto.vehicle.year, isFullyElectric: dto.vehicle.isFullyElectric },
+      });
       const workOrder = await transaction.workOrder.create({
-        data: { vehicleId: vehicle.id, customerId: customer.id, receptionistId, initialComplaint: dto.initialComplaint },
+        data: { vehicleId: vehicle.id, customerId: vehicle.customerId, receptionistId, initialComplaint: dto.initialComplaint },
         select: { id: true, vehicleId: true, customerId: true, status: true, initialComplaint: true, createdAt: true },
       });
       await transaction.technicalHistory.create({
@@ -80,34 +202,252 @@ export class WorkOrderRepository {
     });
   }
 
-  findWorkOrderForAssignment(db: Pick<PrismaService, 'workOrder'>, id: string) {
-    return db.workOrder.findUnique({
-      where: { id },
-      select: { mechanicId: true, status: true },
+  assign(id: string, mechanicId: string): Promise<AssignWorkOrderResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const order = await transaction.workOrder.findUnique({ where: { id } });
+      if (!order) throw new NotFoundException('Work order not found');
+      if (order.mechanicId || order.status !== 'RECIBIDO') throw new Error('Work order is not assignable');
+      const mechanic = await transaction.mechanic.findUnique({ where: { id: mechanicId } });
+      if (!mechanic) throw new NotFoundException('Mechanic not found');
+      if (!mechanic.isActive) throw new Error('Mechanic cannot receive work orders');
+      const assignedOrder = await transaction.workOrder.update({
+        where: { id },
+        data: { mechanicId, assignedAt: new Date(), status: 'ASIGNADA' },
+        select: { id: true, mechanicId: true, status: true, updatedAt: true },
+      });
+      return { ...assignedOrder, mechanicId: assignedOrder.mechanicId as string };
     });
   }
 
-  findMechanicForAssignment(db: Pick<PrismaService, 'mechanic'>, mechanicId: string) {
-    return db.mechanic.findUnique({
-      where: { id: mechanicId },
-      select: { isActive: true },
+  createDiagnostic(id: string, dto: CreateDiagnosticDto, status: string): Promise<DiagnosticResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const diagnostic = await transaction.diagnostic.upsert({
+        where: { workOrderId: id },
+        update: { description: dto.description, suggestedTasks: dto.suggestedTasks, suggestedPartIds: dto.suggestedPartIds, estimatedHours: dto.estimatedHours },
+        create: { workOrderId: id, description: dto.description, suggestedTasks: dto.suggestedTasks, suggestedPartIds: dto.suggestedPartIds, estimatedHours: dto.estimatedHours },
+      });
+      const order = await transaction.workOrder.update({ where: { id }, data: { status }, select: { vehicleId: true } });
+      await transaction.technicalHistory.create({ data: { vehicleId: order.vehicleId, description: `Diagnostic recorded for work order ${id}: ${dto.description}` } });
+      // RN-16: return an explicit allowlist. Never serialize the Prisma entity
+      // into a mechanic-facing response, so future financial fields cannot leak.
+      return {
+        id: diagnostic.id,
+        workOrderId: diagnostic.workOrderId,
+        description: diagnostic.description,
+        suggestedTasks: diagnostic.suggestedTasks as string[],
+        suggestedPartIds: diagnostic.suggestedPartIds as string[],
+        estimatedHours: Number(diagnostic.estimatedHours),
+        createdAt: diagnostic.createdAt,
+      };
     });
   }
 
-  async assignWorkOrder(
-    db: Pick<PrismaService, 'workOrder'>,
-    id: string,
-    mechanicId: string,
-  ): Promise<AssignWorkOrderResponseDto | null> {
-    const result = await db.workOrder.updateMany({
-      where: { id, mechanicId: null, status: 'RECIBIDO' },
-      data: { mechanicId, assignedAt: new Date(), status: 'ASIGNADA' },
+  // HU-07: read context needed to validate a part consumption without
+  // duplicating the transactional stock guard. Returns ownership, status and
+  // the reserved quote part lines (never financial fields).
+  findConsumeContext(workOrderId: string) {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        mechanicId: true,
+        vehicleId: true,
+        quote: {
+          select: {
+            parts: {
+              select: {
+                id: true,
+                sparePartId: true,
+                quantity: true,
+                status: true,
+                sparePart: { select: { code: true, name: true } },
+              },
+            },
+          },
+        },
+      },
     });
-    if (result.count === 0) return null;
+  }
 
-    return db.workOrder.findUnique({
-      where: { id },
-      select: { id: true, mechanicId: true, status: true, updatedAt: true },
-    }) as Promise<AssignWorkOrderResponseDto>;
+  // HU-07 / BE-16 / RN-08: atomically consume a reserved spare part. The stock
+  // decrement (physical + reserved), the INSTALLED status change, the work
+  // order state transition and the immutable kardex record all run inside a
+  // single Prisma transaction. RN-01 is enforced with an atomic guarded update
+  // so the physical stock can never become negative.
+  consumePart(
+    workOrderId: string,
+    dto: ConsumeSparePartDto,
+    userId: string,
+    nextStatus: string,
+  ): Promise<WorkOrderPartResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const order = await transaction.workOrder.findUnique({
+        where: { id: workOrderId },
+        select: {
+          id: true,
+          status: true,
+          vehicleId: true,
+          quote: {
+            select: {
+              parts: {
+                where: { id: dto.workOrderPartId ?? dto.quotePartId },
+                select: {
+                  id: true,
+                  sparePartId: true,
+                  quantity: true,
+                  status: true,
+                  sparePart: { select: { code: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      const part = order?.quote?.parts?.[0];
+      if (!order || !part) throw new NotFoundException('Work order not found');
+      // RN-07: the part must already be reserved for this work order.
+      if (part.status !== 'RESERVED') {
+        throw new UnprocessableEntityException('RN-07: spare part is not reserved for this work order');
+      }
+      const consumed = await transaction.stockMovement.aggregate({
+        _sum: { quantity: true },
+        where: { workOrderId, sparePartId: part.sparePartId, type: 'OUT' },
+      });
+      const consumedQuantity = consumed._sum.quantity ?? 0;
+      const pendingQuantity = part.quantity - consumedQuantity;
+      if (dto.quantity > pendingQuantity) {
+        throw new UnprocessableEntityException('RN-01: quantity exceeds the reserved amount pending for the spare part');
+      }
+      // RN-08 + RN-01: guarded atomic decrement of physical and reserved stock.
+      // The update only matches when both stocks are sufficient, preventing a
+      // negative balance at the database level.
+      const stockUpdate = await transaction.sparePart.updateMany({
+        where: {
+          id: part.sparePartId,
+          physicalStock: { gte: dto.quantity },
+          reservedStock: { gte: dto.quantity },
+        },
+        data: {
+          physicalStock: { decrement: dto.quantity },
+          reservedStock: { decrement: dto.quantity },
+          availableStock: { decrement: dto.quantity },
+          lastMovementAt: new Date(),
+        },
+      });
+      if (stockUpdate.count !== 1) {
+        throw new UnprocessableEntityException('RN-01: insufficient physical stock to consume the spare part');
+      }
+      // Keep a partial reservation available until all reserved units are used.
+      await transaction.quotePart.update({
+        where: { id: part.id },
+        data: { status: dto.quantity === pendingQuantity ? 'INSTALLED' : 'RESERVED' },
+      });
+      // HU-07: first consumption of an approved order moves it to repair.
+      if (nextStatus && nextStatus !== order.status) {
+        await transaction.workOrder.update({ where: { id: workOrderId }, data: { status: nextStatus } });
+      }
+      // BE-17: immutable kardex record (audit trail, never updated/deleted).
+      await transaction.stockMovement.create({
+        data: {
+          workOrderId,
+          sparePartId: part.sparePartId,
+          userId,
+          quantity: dto.quantity,
+          type: 'OUT',
+        },
+      });
+      // RN-19: permanent technical history entry.
+      await transaction.technicalHistory.create({
+        data: {
+          vehicleId: order.vehicleId,
+          description: `Spare part consumed for work order ${workOrderId}: ${part.sparePart.code} x${dto.quantity}`,
+        },
+      });
+      // RN-16: return only the agreed allowlist. No financial fields.
+      return {
+        id: part.id,
+        code: part.sparePart.code,
+        name: part.sparePart.name,
+        quantity: dto.quantity,
+         status: dto.quantity === pendingQuantity ? 'INSTALLED' : 'RESERVED',
+      };
+    });
+  }
+
+  // US-13: read context needed to validate an awaiting-part transition.
+  // Returns ownership, status and the quote parts linked to this work order
+  // so the service can verify the missingPartId belongs to the order.
+  findAwaitingPartContext(workOrderId: string) {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        mechanicId: true,
+        vehicleId: true,
+        quote: {
+          select: {
+            parts: {
+              select: {
+                id: true,
+                sparePartId: true,
+                quantity: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // US-13 / BE-16 / RN-05 / RN-19: atomically set a work order to
+  // EN_ESPERA_DE_REPUESTO. The state transition, the immutable technical
+  // history entry and the inventory discrepancy record all run inside a
+  // single Prisma transaction (BE-16).
+  setAwaitingPart(
+    workOrderId: string,
+    dto: SetAwaitingPartDto,
+    userId: string,
+    vehicleId: string,
+  ): Promise<AwaitingPartResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      // BE-17: update work order status to EN_ESPERA_DE_REPUESTO (RN-05).
+      await transaction.workOrder.update({
+        where: { id: workOrderId },
+        data: { status: 'EN_ESPERA_DE_REPUESTO' },
+      });
+
+      // RN-19: permanent, immutable technical history entry.
+      await transaction.technicalHistory.create({
+        data: {
+          vehicleId,
+          description:
+            `Work order set to AWAITING_PART. Missing spare part id: ${dto.missingPartId}, quantity: ${dto.quantity}. Reason: ${dto.reason}`,
+        },
+      });
+
+      // US-13: register an inventory discrepancy for the workshop lead to
+      // audit the physical stock mismatch later.
+      const discrepancy = await transaction.inventoryDiscrepancy.create({
+        data: {
+          workOrderId,
+          sparePartId: dto.missingPartId,
+          reportedBy: userId,
+          quantity: dto.quantity,
+          reason: dto.reason,
+        },
+      });
+
+      return {
+        id: workOrderId,
+        status: 'EN_ESPERA_DE_REPUESTO',
+        missingPartId: dto.missingPartId,
+        quantity: dto.quantity,
+        reason: dto.reason,
+        createdAt: discrepancy.createdAt,
+      };
+    });
   }
 }

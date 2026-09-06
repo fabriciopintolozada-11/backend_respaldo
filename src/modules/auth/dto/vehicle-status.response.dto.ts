@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class VehicleSummaryDto {
+// BE-02.3 (US-02 / RN-17): public privacy-preserving vehicle status payload.
+// Only these fields are exposed; customer names, phones, diagnostics, prices
+// and any other work-order internal data are deliberately omitted.
+export class PublicVehicleSummaryDto {
   @ApiProperty({ description: 'Marca del vehículo' })
   brand!: string;
 
@@ -11,15 +14,15 @@ export class VehicleSummaryDto {
   year!: number;
 }
 
-export class VehicleStatusResponseDto {
+export class PublicVehicleStatusResponseDto {
   @ApiProperty({ description: 'Identificador de la Orden de Trabajo' })
   workOrderId!: string;
 
   @ApiProperty({ description: 'Placa del vehículo' })
   plate!: string;
 
-  @ApiProperty({ type: VehicleSummaryDto, description: 'Resumen del vehículo' })
-  vehicle!: VehicleSummaryDto;
+  @ApiProperty({ type: PublicVehicleSummaryDto, description: 'Resumen del vehículo' })
+  vehicle!: PublicVehicleSummaryDto;
 
   @ApiProperty({ description: 'Fecha de creación de la Orden de Trabajo' })
   createdAt!: Date;

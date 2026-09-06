@@ -122,9 +122,9 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
       .expect(200);
 
     expect(response.body.id).toBe(ownWorkOrderId);
-    expect(response.body.plate).toBe(plate);
-    expect(response.body.brand).toBe('Toyota');
-    expect(response.body.model).toBe('Corolla');
+    expect(response.body.vehicle.plate).toBe(plate);
+    expect(response.body.vehicle.brand).toBe('Toyota');
+    expect(response.body.vehicle.model).toBe('Corolla');
     expect(JSON.stringify(response.body)).not.toMatch(/price|cost|amount|rate/i);
   });
 
