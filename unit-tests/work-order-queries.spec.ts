@@ -58,7 +58,7 @@ describe('WorkOrdersService HU-04 queries', () => {
   });
 
   it('returns only active mechanics in the paginated assignment catalog', async () => {
-    const mechanics = [{ id: 'mechanic-1', isActive: true }];
+    const mechanics = [{ id: 'mechanic-1', isActive: true, name: 'Mecánico Uno' }];
     repository.findActiveMechanics.mockResolvedValue(mechanics);
     repository.countActiveMechanics.mockResolvedValue(1);
 

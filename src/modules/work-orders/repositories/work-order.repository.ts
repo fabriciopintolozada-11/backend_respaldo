@@ -28,6 +28,7 @@ export interface AvailableWorkOrderRow {
 export interface ActiveMechanicRow {
   id: string;
   isActive: boolean;
+  name: string | null;
 }
 
 @Injectable()
@@ -136,14 +137,23 @@ export class WorkOrderRepository {
     return this.prisma.workOrder.count({ where: { status: 'RECIBIDO', mechanicId: null } });
   }
 
-  findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
-    return this.prisma.mechanic.findMany({
+  async findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
+    const mechanics = await this.prisma.mechanic.findMany({
       where: { isActive: true },
       orderBy: { id: 'asc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
       select: { id: true, isActive: true },
     });
+    if (mechanics.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: mechanics.map((m) => m.id) } },
+      select: { id: true, fullName: true },
+    });
+    const nameByUserId = new Map(users.map((u) => [u.id, u.fullName]));
+
+    return mechanics.map((m) => ({ ...m, name: nameByUserId.get(m.id) ?? null }));
   }
 
   countActiveMechanics(): Promise<number> {

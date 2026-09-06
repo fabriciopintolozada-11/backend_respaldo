@@ -14,6 +14,9 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
       count: jest.fn(),
       findUnique: jest.fn(),
     },
+    user: {
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
   let repository: WorkOrderRepository;
@@ -62,14 +65,30 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
     }));
   });
 
-  it('queries active mechanics only', async () => {
+  it('queries active mechanics with their name from the users table', async () => {
     prisma.mechanic.findMany.mockResolvedValue([{ id: 'mechanic-1', isActive: true }]);
+    prisma.user.findMany.mockResolvedValue([{ id: 'mechanic-1', fullName: 'Mecánico Uno' }]);
 
-    await expect(repository.findActiveMechanics(1, 20)).resolves.toEqual([{ id: 'mechanic-1', isActive: true }]);
+    await expect(repository.findActiveMechanics(1, 20)).resolves.toEqual([{
+      id: 'mechanic-1', isActive: true, name: 'Mecánico Uno',
+    }]);
     expect(prisma.mechanic.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { isActive: true },
       take: 20,
     }));
+    expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: ['mechanic-1'] } },
+      select: { id: true, fullName: true },
+    }));
+  });
+
+  it('falls back to null name when a mechanic has no matching user', async () => {
+    prisma.mechanic.findMany.mockResolvedValue([{ id: 'orphan-mechanic', isActive: true }]);
+    prisma.user.findMany.mockResolvedValue([]);
+
+    await expect(repository.findActiveMechanics(1, 20)).resolves.toEqual([{
+      id: 'orphan-mechanic', isActive: true, name: null,
+    }]);
   });
 
   it('assigns a received order to an active mechanic atomically', async () => {
