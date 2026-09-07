@@ -5,7 +5,8 @@ import { IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-valid
 // The part is identified by its quote_parts id (the approved quote line is the
 // work order part itself, per the agreed hybrid model). quantity must be >= 1.
 export class ConsumeSparePartDto {
-  @ApiProperty({ description: 'ID of the reserved work-order part to install' })
+  @ApiPropertyOptional({ description: 'ID of the reserved work-order part to install' })
+  @IsOptional()
   @IsUUID()
   workOrderPartId?: string;
 

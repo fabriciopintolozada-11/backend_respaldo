@@ -161,7 +161,6 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
 
   describe('ConsumeSparePartDto validation (BE-10)', () => {
     it.each([
-      [{ workOrderPartId: undefined, quantity: 1 }, 'workOrderPartId'],
       [{ workOrderPartId: 'not-a-uuid', quantity: 1 }, 'workOrderPartId'],
       [{ workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', quantity: 0 }, 'quantity'],
       [{ workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', quantity: -1 }, 'quantity'],
@@ -177,6 +176,15 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
         workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         quantity: 1,
         notes: 'Filtro llegó con el empaque dañado',
+      });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts the mechanic payload { quotePartId, quantity } without workOrderPartId (HU-07 regression)', async () => {
+      const dto = plainToInstance(ConsumeSparePartDto, {
+        quotePartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        quantity: 1,
       });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
