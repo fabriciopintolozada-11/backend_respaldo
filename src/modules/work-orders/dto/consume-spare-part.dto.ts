@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 
 // HU-07: payload to confirm the installation of a reserved spare part.
 // The part is identified by its quote_parts id (the approved quote line is the
@@ -18,4 +18,10 @@ export class ConsumeSparePartDto {
   @IsInt()
   @Min(1)
   quantity!: number;
+
+  @ApiPropertyOptional({ description: 'Optional note recorded in the kardex when consuming the part' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
 }
