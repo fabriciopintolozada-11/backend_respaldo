@@ -6,7 +6,7 @@ import { ConsumeSparePartDto } from '../src/modules/work-orders/dto/consume-spar
 // atomic Prisma transaction. These tests assert the stock decrement, the
 // INSTALLED status change, the kardex record and the negative-stock guard.
 describe('WorkOrderRepository.consumePart (HU-07)', () => {
-  const orderWithPart = (status = 'APROBADO', partStatus = 'RESERVED', quantity = 2) => ({
+  const orderWithPart = (status = 'APROBADO', partStatus = 'RESERVED', quantity = 1) => ({
     id: 'wo-1',
     status,
     vehicleId: 'veh-1',
@@ -33,7 +33,10 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
       },
       sparePart: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       quotePart: { update: jest.fn().mockResolvedValue(undefined) },
-      stockMovement: { create: jest.fn().mockResolvedValue(undefined) },
+      stockMovement: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        create: jest.fn().mockResolvedValue(undefined),
+      },
       technicalHistory: { create: jest.fn().mockResolvedValue(undefined) },
       ...overrides,
     };
@@ -55,7 +58,12 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
 
     expect(tx.sparePart.updateMany).toHaveBeenCalledWith({
       where: { id: 'sp-1', physicalStock: { gte: 1 }, reservedStock: { gte: 1 } },
-      data: { physicalStock: { decrement: 1 }, reservedStock: { decrement: 1 }, lastMovementAt: expect.any(Date) },
+      data: {
+        physicalStock: { decrement: 1 },
+        reservedStock: { decrement: 1 },
+        availableStock: { decrement: 1 },
+        lastMovementAt: expect.any(Date),
+      },
     });
     expect(tx.quotePart.update).toHaveBeenCalledWith({
       where: { id: 'qp-1' },
@@ -86,6 +94,24 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     await repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION');
 
     expect(tx.workOrder.update).not.toHaveBeenCalled();
+  });
+
+  it('records the optional notes as the kardex reason (BE-T07.2)', async () => {
+    const tx = makeTx();
+    const { repository } = makeRepository(tx);
+
+    await repository.consumePart('wo-1', { ...dto, notes: 'Filtro llegó con el empaque roto' }, 'mech-1', 'EN_REPARACION');
+
+    expect(tx.stockMovement.create).toHaveBeenCalledWith({
+      data: {
+        workOrderId: 'wo-1',
+        sparePartId: 'sp-1',
+        userId: 'mech-1',
+        quantity: 1,
+        type: 'OUT',
+        reason: 'Filtro llegó con el empaque roto',
+      },
+    });
   });
 
   it('rejects consumption when physical stock is insufficient and writes nothing else (RN-01)', async () => {
