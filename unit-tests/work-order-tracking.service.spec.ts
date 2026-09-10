@@ -87,7 +87,60 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
 
     expect(tracking.pausedReason).toBe('Awaiting customer approval');
     expect(tracking.daysWaitingApproval).toBe(3);
+    expect(tracking.isStaleQuote).toBe(false);
     expect(tracking.missingPartName).toBeNull();
+  });
+
+  it('flags an order as stale when it awaits approval for 15+ days (US-16 / RN-06)', async () => {
+    const quoteCreatedAt = new Date('2026-08-20T00:00:00Z');
+    repository.findTrackingSummary.mockResolvedValue([
+      { ...baseRow, status: 'PRESUPUESTO_ENVIADO', quoteCreatedAt },
+    ]);
+
+    const [tracking] = await service.getTrackingSummary({});
+
+    expect(tracking.daysWaitingApproval).toBe(17);
+    expect(tracking.isStaleQuote).toBe(true);
+  });
+
+  it('does not flag non-PRESUPUESTO_ENVIADO orders as stale (US-16 / RN-06)', async () => {
+    repository.findTrackingSummary.mockResolvedValue([
+      { ...baseRow, status: 'EN_REPARACION', quoteCreatedAt: new Date('2026-08-01T00:00:00Z') },
+    ]);
+
+    const [tracking] = await service.getTrackingSummary({});
+
+    expect(tracking.daysWaitingApproval).toBeNull();
+    expect(tracking.isStaleQuote).toBe(false);
+  });
+
+  it('forwards onlyStaleQuotes=false without a stale quote cutoff (US-16 / BE-T16.3)', async () => {
+    repository.findTrackingSummary.mockResolvedValue([]);
+
+    await service.getTrackingSummary({ onlyStaleQuotes: false });
+
+    expect(repository.findTrackingSummary).toHaveBeenCalledWith({
+      licensePlate: undefined,
+      status: undefined,
+      workBayId: undefined,
+      staleQuoteCutoff: undefined,
+    });
+  });
+
+  it('computes the 15-day cutoff and requests a DB-level filter when onlyStaleQuotes=true (US-16 / BE-T16.3)', async () => {
+    repository.findTrackingSummary.mockResolvedValue([]);
+
+    await service.getTrackingSummary({ onlyStaleQuotes: true });
+
+    // NOW is mocked to 2026-09-06T00:00:00Z -> cutoff 15 days earlier.
+    expect(repository.findTrackingSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        licensePlate: undefined,
+        status: undefined,
+        workBayId: undefined,
+        staleQuoteCutoff: new Date('2026-08-22T00:00:00Z'),
+      }),
+    );
   });
 
   it('keeps pause fields null for a normal in-shop order', async () => {
@@ -98,6 +151,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     expect(tracking.missingPartName).toBeNull();
     expect(tracking.pausedReason).toBeNull();
     expect(tracking.daysWaitingApproval).toBeNull();
+    expect(tracking.isStaleQuote).toBe(false);
   });
 
   it('returns an empty list when no work orders match', async () => {

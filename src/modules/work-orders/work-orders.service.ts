@@ -28,6 +28,15 @@ function elapsedDays(since: Date, now: number): number {
   return Math.max(0, Math.floor((now - since.getTime()) / 86_400_000));
 }
 
+// RN-06 (US-16): an order awaiting quote approval for at least 15 continuous
+// days triggers the reception alert.
+export const STALE_QUOTE_THRESHOLD_DAYS = 15;
+
+// SUP-15: the schema has no work_orders.quote_sent_at column; the work order
+// transitions to PRESUPUESTO_ENVIADO in the same transaction that creates the
+// Quote (quote.repository.ts), so Quote.createdAt is the formal emission date.
+export const STALE_QUOTE_REFERENCE = 'quote.createdAt as quote emission date (SUP-15)';
+
 // BE-T05.3: aggregates kardex OUT movements per installed spare part, keeping
 // the earliest (immutable) consumption date.
 function aggregateConsumedParts(
@@ -89,13 +98,21 @@ export class WorkOrdersService {
   // US-05 / BE-T05.1 + BE-T05.2: tracking summary for the reactive search by
   // plate, status or bay. Pause details and days in workshop are derived here
   // (BE-06) from immutably recorded dates (RN-19).
+  //
+  // US-16 / RN-06 (BE-T16.1, BE-T16.3): the 15-day staleness threshold and the
+  // cutoff are computed here and passed to the repository, which filters at the
+  // database level when onlyStaleQuotes=true.
   async getTrackingSummary(query: QueryTrackingWorkOrdersDto): Promise<WorkOrderTrackingResponseDto[]> {
+    const now = Date.now();
     const rows = await this.repository.findTrackingSummary({
       licensePlate: query.licensePlate ? normalizePlate(query.licensePlate) : undefined,
       status: query.status,
       workBayId: query.workBayId,
+      staleQuoteCutoff:
+        query.onlyStaleQuotes === true
+          ? new Date(now - STALE_QUOTE_THRESHOLD_DAYS * 86_400_000)
+          : undefined,
     });
-    const now = Date.now();
 
     return rows.map((row) => {
       let missingPartName: string | null = null;
@@ -112,6 +129,9 @@ export class WorkOrdersService {
         pausedReason = 'Awaiting customer approval';
         daysWaitingApproval = elapsedDays(row.quoteCreatedAt, now);
       }
+      // BE-T16.2 (US-16 / RN-06): computed flag surfaced to the tracking DTO.
+      const isStaleQuote =
+        daysWaitingApproval !== null && daysWaitingApproval >= STALE_QUOTE_THRESHOLD_DAYS;
 
       return {
         id: row.id,
@@ -127,6 +147,7 @@ export class WorkOrdersService {
         missingPartName,
         pausedReason,
         daysWaitingApproval,
+        isStaleQuote,
       };
     });
   }

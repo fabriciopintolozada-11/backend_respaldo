@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
 // US-05 (RN-05): status vocabulary of the work-order state machine. The same
@@ -33,4 +34,15 @@ export class QueryTrackingWorkOrdersDto {
   @IsOptional()
   @IsUUID()
   workBayId?: string;
+
+  // BE-T16.3 (US-16 / RN-06): filters in the database to the orders that have
+  // been awaiting quote approval for 15+ days. Query strings arrive as
+  // 'true'/'false', so the boolean is coerced with @Transform.
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Only return PRESUPUESTO_ENVIADO orders waiting approval for 15+ days (US-16 / RN-06)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  onlyStaleQuotes?: boolean;
 }
