@@ -15,13 +15,116 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
+import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
+import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response.dto';
+import type { VehicleHistoryRow } from './repositories/work-order.repository';
+import { VehicleHistoryConsumedPartDto, VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
+
+function elapsedDays(since: Date, now: number): number {
+  return Math.max(0, Math.floor((now - since.getTime()) / 86_400_000));
+}
+
+// BE-T05.3: aggregates kardex OUT movements per installed spare part, keeping
+// the earliest (immutable) consumption date.
+function aggregateConsumedParts(
+  movements: VehicleHistoryRow['workOrders'][number]['stockMovements'],
+): VehicleHistoryConsumedPartDto[] {
+  const byPart = new Map<string, VehicleHistoryConsumedPartDto>();
+  for (const movement of movements) {
+    const current = byPart.get(movement.sparePart.id);
+    byPart.set(movement.sparePart.id, {
+      sparePartId: movement.sparePart.id,
+      code: movement.sparePart.code,
+      name: movement.sparePart.name,
+      quantity: (current?.quantity ?? 0) + movement.quantity,
+      createdAt: current?.createdAt ?? movement.createdAt,
+    });
+  }
+  return [...byPart.values()];
+}
 
 @Injectable()
 export class WorkOrdersService {
   constructor(private readonly repository: WorkOrderRepository) {}
 
-  getVehicleHistory(plate: string) {
-    return this.repository.findVehicleHistory(normalizePlate(plate));
+  // US-05 / BE-T05.3: vehicle file with the previous delivered work orders
+  // (diagnosis + installed parts) and the immutable technical history (RN-19).
+  async getVehicleHistory(plate: string): Promise<VehicleHistoryResponseDto> {
+    const vehicle = await this.repository.findVehicleHistory(normalizePlate(plate));
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+    return {
+      id: vehicle.id,
+      plate: vehicle.plate,
+      brand: vehicle.brand,
+      model: vehicle.model,
+      year: vehicle.year,
+      isFullyElectric: vehicle.isFullyElectric,
+      customerId: vehicle.customerId,
+      customer: vehicle.customer,
+      technicalHistory: vehicle.technicalHistory,
+      workOrders: vehicle.workOrders.map((order) => ({
+        id: order.id,
+        status: order.status,
+        createdAt: order.createdAt,
+        diagnostic: order.diagnostic
+          ? {
+              id: order.diagnostic.id,
+              description: order.diagnostic.description,
+              suggestedTasks: Array.isArray(order.diagnostic.suggestedTasks)
+                ? (order.diagnostic.suggestedTasks as string[])
+                : [],
+              estimatedHours: Number(order.diagnostic.estimatedHours),
+              createdAt: order.diagnostic.createdAt,
+            }
+          : null,
+        consumedParts: aggregateConsumedParts(order.stockMovements),
+      })),
+    };
+  }
+
+  // US-05 / BE-T05.1 + BE-T05.2: tracking summary for the reactive search by
+  // plate, status or bay. Pause details and days in workshop are derived here
+  // (BE-06) from immutably recorded dates (RN-19).
+  async getTrackingSummary(query: QueryTrackingWorkOrdersDto): Promise<WorkOrderTrackingResponseDto[]> {
+    const rows = await this.repository.findTrackingSummary({
+      licensePlate: query.licensePlate ? normalizePlate(query.licensePlate) : undefined,
+      status: query.status,
+      workBayId: query.workBayId,
+    });
+    const now = Date.now();
+
+    return rows.map((row) => {
+      let missingPartName: string | null = null;
+      let pausedReason: string | null = null;
+      let daysWaitingApproval: number | null = null;
+
+      // US-13 / RN-05: awaiting part with the pending warehouse discrepancy.
+      if (row.status === 'EN_ESPERA_DE_REPUESTO' && row.discrepancy) {
+        missingPartName = row.discrepancy.sparePartName;
+        pausedReason = row.discrepancy.pausedReason;
+      }
+      // Rendezvous awaiting customer approval after the budget was sent.
+      if (row.status === 'PRESUPUESTO_ENVIADO' && row.quoteCreatedAt) {
+        pausedReason = 'Awaiting customer approval';
+        daysWaitingApproval = elapsedDays(row.quoteCreatedAt, now);
+      }
+
+      return {
+        id: row.id,
+        plate: row.plate,
+        model: row.model,
+        status: row.status,
+        entryDate: row.createdAt,
+        daysInWorkshop: elapsedDays(row.createdAt, now),
+        bayId: row.bayId,
+        bayNumber: row.bayNumber,
+        mechanicName: row.mechanicName,
+        customerPhone: row.customerPhone,
+        missingPartName,
+        pausedReason,
+        daysWaitingApproval,
+      };
+    });
   }
 
   // HU-12: the advisor reads the diagnostic for the work order before quoting.

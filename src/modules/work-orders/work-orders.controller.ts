@@ -19,6 +19,9 @@ import { CompleteWorkOrderResponseDto } from './dto/complete-work-order.response
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
+import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
+import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response.dto';
+import { VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -42,11 +45,27 @@ export class WorkOrdersController {
     return this.service.getActiveMechanics(query);
   }
 
+  // US-05 / BE-T05.1: reactive tracking summary filtered by plate, status or
+  // bay for reception and the workshop lead. Declared before any ':id' route
+  // so the literal path wins.
+  @Get('work-orders/tracking-summary')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get work order tracking summary by plate, status or bay (US-05 / BE-T05.1, RN-20)' })
+  @ApiResponse({ status: 200, type: [WorkOrderTrackingResponseDto] })
+  getTrackingSummary(@Query() query: QueryTrackingWorkOrdersDto): Promise<WorkOrderTrackingResponseDto[]> {
+    return this.service.getTrackingSummary(query);
+  }
+
+  // US-05 / BE-T05.3 + RN-19: previous delivered work orders of a vehicle with
+  // their diagnosis, installed spare parts and immutable dates.
   @Get('vehicles/:plate/history')
-  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
-  @ApiOperation({ summary: 'Get vehicle technical history (US-01, RN-20)' })
-  @ApiResponse({ status: 200 })
-  getHistory(@Param('plate') plate: string) { return this.service.getVehicleHistory(plate); }
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get vehicle technical history with previous delivered work orders (US-01, US-05 / BE-T05.3, RN-19, RN-20)' })
+  @ApiResponse({ status: 200, type: VehicleHistoryResponseDto })
+  @ApiResponse({ status: 404, description: 'Vehicle not found' })
+  getHistory(@Param('plate') plate: string): Promise<VehicleHistoryResponseDto> {
+    return this.service.getVehicleHistory(plate);
+  }
 
   // HU-12: list work orders in EN_DIAGNOSTICO ready to be quoted. Declared
   // before any ':id' route so the literal path wins.

@@ -27,6 +27,56 @@ export interface AvailableWorkOrderRow {
   mechanicId: string | null;
 }
 
+// BE-T05.2: row for the tracking summary. Suspension data (pending discrepancy
+// and quote creation date) is read so the service can derive the pause reason
+// and the days waiting for customer approval.
+export interface WorkOrderTrackingRow {
+  id: string;
+  status: string;
+  createdAt: Date;
+  plate: string;
+  model: string;
+  customerPhone: string | null;
+  mechanicName: string | null;
+  bayId: string | null;
+  bayNumber: number | null;
+  quoteCreatedAt: Date | null;
+  discrepancy: { sparePartName: string; pausedReason: string } | null;
+}
+
+// BE-T05.3: only these terminal states count as a previous delivered visit.
+// FINALIZADO is the legacy closed state; ENTREGADO is the delivered state.
+const DELIVERED_WORK_ORDER_STATUSES: string[] = ['ENTREGADO', 'FINALIZADO'];
+
+export interface VehicleHistoryRow {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  isFullyElectric: boolean;
+  customerId: string;
+  customer: { id: string; identification: string; name: string; phone: string | null };
+  technicalHistory: { id: string; description: string; createdAt: Date }[];
+  workOrders: {
+    id: string;
+    status: string;
+    createdAt: Date;
+    diagnostic: {
+      id: string;
+      description: string;
+      suggestedTasks: Prisma.JsonValue;
+      estimatedHours: Prisma.Decimal;
+      createdAt: Date;
+    } | null;
+    stockMovements: {
+      quantity: number;
+      createdAt: Date;
+      sparePart: { id: string; code: string; name: string };
+    }[];
+  }[];
+}
+
 export interface ActiveMechanicRow {
   id: string;
   isActive: boolean;
@@ -162,20 +212,121 @@ export class WorkOrderRepository {
     return this.prisma.mechanic.count({ where: { isActive: true } });
   }
 
-  async findVehicleHistory(plate: string) {
-    const vehicle = await this.prisma.vehicle.findUnique({
+  // US-05 / BE-T05.3: previous delivered work orders of a vehicle with their
+  // immutable diagnosis, installed spare parts (kardex OUT movements) and dates
+  // (RN-19). Active orders are intentionally excluded from the history.
+  async findVehicleHistory(plate: string): Promise<VehicleHistoryRow | null> {
+    return this.prisma.vehicle.findUnique({
       where: { plate },
-      include: {
-        customer: true,
-        technicalHistory: { orderBy: { createdAt: 'desc' } },
-        workOrders: {
+      select: {
+        id: true,
+        plate: true,
+        brand: true,
+        model: true,
+        year: true,
+        isFullyElectric: true,
+        customerId: true,
+        customer: { select: { id: true, identification: true, name: true, phone: true } },
+        technicalHistory: {
           orderBy: { createdAt: 'desc' },
-          include: { mechanic: true },
+          select: { id: true, description: true, createdAt: true },
+        },
+        workOrders: {
+          where: { status: { in: DELIVERED_WORK_ORDER_STATUSES } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            diagnostic: {
+              select: {
+                id: true,
+                description: true,
+                suggestedTasks: true,
+                estimatedHours: true,
+                createdAt: true,
+              },
+            },
+            stockMovements: {
+              where: { type: 'OUT' },
+              orderBy: { createdAt: 'asc' },
+              select: {
+                quantity: true,
+                createdAt: true,
+                sparePart: { select: { id: true, code: true, name: true } },
+              },
+            },
+          },
         },
       },
     });
-    if (!vehicle) throw new NotFoundException('Vehicle not found');
-    return vehicle;
+  }
+
+  // US-05 / BE-T05.1: tracking summary filtered by license plate, status or
+  // physical bay. Mechanic names are resolved from the users table because
+  // Mechanic.id doubles as User.id (seed convention), mirroring the bay
+  // monitoring query (US-18).
+  async findTrackingSummary(filters: {
+    licensePlate?: string;
+    status?: string;
+    workBayId?: string;
+  }): Promise<WorkOrderTrackingRow[]> {
+    const orders = await this.prisma.workOrder.findMany({
+      where: {
+        ...(filters.licensePlate ? { vehicle: { is: { plate: filters.licensePlate } } } : {}),
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.workBayId ? { currentBay: { is: { id: filters.workBayId } } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        vehicle: { select: { plate: true, model: true } },
+        customer: { select: { phone: true } },
+        mechanic: { select: { id: true } },
+        currentBay: { select: { id: true, bayNumber: true } },
+        quote: { select: { createdAt: true } },
+        inventoryDiscrepancies: {
+          where: { status: 'PENDING' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { reason: true, sparePart: { select: { name: true } } },
+        },
+      },
+    });
+
+    const mechanicIds = orders
+      .map((order) => order.mechanic?.id)
+      .filter((id): id is string => Boolean(id));
+    const nameByUserId = new Map<string, string>();
+    if (mechanicIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: mechanicIds } },
+        select: { id: true, fullName: true },
+      });
+      users.forEach((user) => nameByUserId.set(user.id, user.fullName));
+    }
+
+    return orders.map((order) => {
+      const discrepancy = order.inventoryDiscrepancies[0];
+      return {
+        id: order.id,
+        status: order.status,
+        createdAt: order.createdAt,
+        plate: order.vehicle.plate,
+        model: order.vehicle.model,
+        customerPhone: order.customer.phone,
+        mechanicName: order.mechanic ? nameByUserId.get(order.mechanic.id) ?? null : null,
+        bayId: order.currentBay?.id ?? null,
+        bayNumber: order.currentBay?.bayNumber ?? null,
+        quoteCreatedAt: order.quote?.createdAt ?? null,
+        discrepancy:
+          discrepancy && discrepancy.sparePart
+            ? { sparePartName: discrepancy.sparePart.name, pausedReason: discrepancy.reason }
+            : null,
+      };
+    });
   }
 
   createVehicleEntry(dto: RegisterVehicleEntryDto, receptionistId: string): Promise<WorkOrderResponseDto> {
