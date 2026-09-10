@@ -348,6 +348,7 @@ export class WorkOrderRepository {
         await transaction.workOrder.update({ where: { id: workOrderId }, data: { status: nextStatus } });
       }
       // BE-17: immutable kardex record (audit trail, never updated/deleted).
+      // The mechanic's optional note is persisted as the movement reason.
       await transaction.stockMovement.create({
         data: {
           workOrderId,
@@ -355,6 +356,7 @@ export class WorkOrderRepository {
           userId,
           quantity: dto.quantity,
           type: 'OUT',
+          ...(dto.notes ? { reason: dto.notes } : {}),
         },
       });
       // RN-19: permanent technical history entry.

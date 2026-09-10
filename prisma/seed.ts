@@ -181,7 +181,6 @@ async function main() {
       }),
     ),
   );
-
   // 7. Diagnósticos (solo si no existen para esa OT)
   const existingDiag1 = await prisma.diagnostic.findUnique({ where: { workOrderId: workOrders[0].id } });
   if (!existingDiag1) {

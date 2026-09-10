@@ -64,7 +64,7 @@ model WorkOrder {
   vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
   customer         Customer  @relation(fields: [customerId], references: [id])
   mechanic         Mechanic? @relation(fields: [mechanicId], references: [id])
-  currentBay       WorkBay?  @relation("CurrentWorkOrder") // US-18: virtual reverse of work_bays.current_work_order_id
+  currentBay       WorkBay?  @relation("CurrentWorkOrder")
   diagnostic       Diagnostic?
   quote            Quote?
   notifications          Notification[]
@@ -79,9 +79,9 @@ model WorkOrder {
 
 model WorkBay {
   id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
-  bayNumber          Int        @unique @map("bay_number") // US-18: physical bay 1..4
+  bayNumber          Int        @unique @map("bay_number")
   isOccupied         Boolean    @default(false) @map("is_occupied")
-  currentWorkOrderId String?    @unique @db.Uuid @map("current_work_order_id") // US-18: active OT in this bay (1:1)
+  currentWorkOrderId String?    @unique @db.Uuid @map("current_work_order_id")
   currentWorkOrder   WorkOrder? @relation("CurrentWorkOrder", fields: [currentWorkOrderId], references: [id], onDelete: SetNull)
   createdAt          DateTime   @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt          DateTime   @updatedAt @db.Timestamptz(6) @map("updated_at")

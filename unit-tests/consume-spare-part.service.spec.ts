@@ -127,14 +127,17 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
     });
   });
 
+  // RN-01: the over-reservation guard (quantity > pending) was moved to the
+  // repository's atomic $transaction. It is covered by
+  // unit-tests/work-order-part-consume.repository.spec.ts, not the service.
   describe('RN-01: quantity limits', () => {
-    it('rejects consuming more than the reserved quantity', async () => {
+    it('delegates the quantity guard to the atomic repository transaction', async () => {
       repository.findConsumeContext = jest.fn().mockResolvedValue(baseContext);
       const overDto: ConsumeSparePartDto = { quotePartId: 'qp-1', quantity: 3 };
 
-      await expect(service.consumePart('wo-1', 'mech-1', UserRole.MECHANIC, overDto))
-        .rejects.toThrow(UnprocessableEntityException);
-      expect(repository.consumePart).not.toHaveBeenCalled();
+      await service.consumePart('wo-1', 'mech-1', UserRole.MECHANIC, overDto);
+
+      expect(repository.consumePart).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -158,10 +161,10 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
 
   describe('ConsumeSparePartDto validation (BE-10)', () => {
     it.each([
-      [{ quotePartId: undefined, quantity: 1 }, 'quotePartId'],
-      [{ quotePartId: 'not-a-uuid', quantity: 1 }, 'quotePartId'],
-      [{ quotePartId: 'qp-1', quantity: 0 }, 'quantity'],
-      [{ quotePartId: 'qp-1', quantity: -1 }, 'quantity'],
+      [{ workOrderPartId: 'not-a-uuid', quantity: 1 }, 'workOrderPartId'],
+      [{ workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', quantity: 0 }, 'quantity'],
+      [{ workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', quantity: -1 }, 'quantity'],
+      [{ workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', quantity: 1, notes: 123 }, 'notes'],
     ])('rejects invalid payload %j (field: %s)', async (payload, field) => {
       const dto = plainToInstance(ConsumeSparePartDto, payload);
       const errors = await validate(dto);
@@ -169,6 +172,16 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
     });
 
     it('accepts a valid payload', async () => {
+      const dto = plainToInstance(ConsumeSparePartDto, {
+        workOrderPartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        quantity: 1,
+        notes: 'Filtro llegó con el empaque dañado',
+      });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts the mechanic payload { quotePartId, quantity } without workOrderPartId (HU-07 regression)', async () => {
       const dto = plainToInstance(ConsumeSparePartDto, {
         quotePartId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         quantity: 1,
