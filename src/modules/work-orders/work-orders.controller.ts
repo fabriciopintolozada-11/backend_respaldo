@@ -16,6 +16,9 @@ import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
 import { CompleteWorkOrderDto } from './dto/complete-work-order.dto';
 import { CompleteWorkOrderResponseDto } from './dto/complete-work-order.response.dto';
+import { DeliverWorkOrderDto } from './dto/deliver-work-order.dto';
+import { DeliverWorkOrderResponseDto } from './dto/deliver-work-order.response.dto';
+import { WorkOrderSettlementResponseDto } from './dto/work-order-settlement.response.dto';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
@@ -159,5 +162,38 @@ export class WorkOrdersController {
     @Req() request: Request,
   ): Promise<CompleteWorkOrderResponseDto> {
     return this.service.complete(id, request.user.id, request.user.role, dto);
+  }
+
+  // US-20: consolidated settlement (RN-21) of a work order ready to be
+  // delivered. Only RECEPTIONIST and ADMIN see the monetary values (BE-12).
+  @Get('work-orders/:id/settlement')
+  @Roles(UserRole.RECEPTIONIST, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get the consolidated settlement in BOB for a ready work order (US-20, RN-21)' })
+  @ApiResponse({ status: 200, type: WorkOrderSettlementResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA status (RN-05)' })
+  getSettlement(@Param('id', ParseUUIDPipe) id: string): Promise<WorkOrderSettlementResponseDto> {
+    return this.service.getSettlement(id);
+  }
+
+  // US-20: settle the account and register the vehicle handover (RN-21,
+  // RN-19). The total is always computed by the backend from the approved
+  // quote; the client only provides payment data (BE-13).
+  @Post('work-orders/:id/deliver')
+  @Roles(UserRole.RECEPTIONIST, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Register payment and deliver the vehicle (US-20, RN-21, RN-19)' })
+  @ApiResponse({ status: 200, type: DeliverWorkOrderResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation error in the request body' })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA or already delivered' })
+  deliver(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeliverWorkOrderDto,
+    @Req() request: Request,
+  ): Promise<DeliverWorkOrderResponseDto> {
+    return this.service.deliver(id, request.user.id, dto);
   }
 }
