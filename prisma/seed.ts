@@ -164,6 +164,24 @@ async function main() {
 
   const workOrders = [workOrder1, workOrder2, workOrder3, workOrder4];
 
+  // 6b. US-18: las 4 bahías físicas del taller (upsert — no borra nada).
+  //    Bahía 1 → OT en APROBADO, Bahía 2 → OT en EN_REPARACION, 3 y 4 libres.
+  const bayData = [
+    { bayNumber: 1, isOccupied: true, currentWorkOrderId: workOrder1.id },
+    { bayNumber: 2, isOccupied: true, currentWorkOrderId: workOrder2.id },
+    { bayNumber: 3, isOccupied: false, currentWorkOrderId: null },
+    { bayNumber: 4, isOccupied: false, currentWorkOrderId: null },
+  ];
+  const createdBays = await Promise.all(
+    bayData.map((b) =>
+      prisma.workBay.upsert({
+        where: { bayNumber: b.bayNumber },
+        update: { isOccupied: b.isOccupied, currentWorkOrderId: b.currentWorkOrderId },
+        create: b,
+      }),
+    ),
+  );
+
   // 7. Diagnósticos (solo si no existen para esa OT)
   const existingDiag1 = await prisma.diagnostic.findUnique({ where: { workOrderId: workOrders[0].id } });
   if (!existingDiag1) {
@@ -267,6 +285,7 @@ async function main() {
   console.log(`   - ${workOrders.length} órdenes de trabajo`);
   console.log(`   - ${spareParts.length} repuestos en catálogo`);
   console.log(`   - 4 QuoteParts con status RESERVED (para HU-07)`);
+  console.log(`   - ${createdBays.length} bahías físicas (2 ocupadas + 2 disponibles)`);
 }
 
 main()
