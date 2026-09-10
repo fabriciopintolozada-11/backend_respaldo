@@ -9,6 +9,7 @@ import { JwtModule } from '@nestjs/jwt';
 import Joi from 'joi';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
+import { WorkBaysModule } from './modules/work-bays/work-bays.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
     AssignedOrdersModule, 
     AuthModule, 
     QuotesModule, 
-    SparePartsModule
+    SparePartsModule,
+    WorkBaysModule
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
