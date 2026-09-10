@@ -266,16 +266,27 @@ export class WorkOrderRepository {
   // physical bay. Mechanic names are resolved from the users table because
   // Mechanic.id doubles as User.id (seed convention), mirroring the bay
   // monitoring query (US-18).
+  //
+  // US-16 / RN-06 (BE-T16.3): when the service passes a staleQuoteCutoff, the
+  // query filters at the database to PRESUPUESTO_ENVIADO orders whose quote was
+  // emitted before that date (15+ days waiting approval).
   async findTrackingSummary(filters: {
     licensePlate?: string;
     status?: string;
     workBayId?: string;
+    staleQuoteCutoff?: Date;
   }): Promise<WorkOrderTrackingRow[]> {
     const orders = await this.prisma.workOrder.findMany({
       where: {
         ...(filters.licensePlate ? { vehicle: { is: { plate: filters.licensePlate } } } : {}),
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.workBayId ? { currentBay: { is: { id: filters.workBayId } } } : {}),
+        ...(filters.staleQuoteCutoff
+          ? {
+              status: 'PRESUPUESTO_ENVIADO',
+              quote: { is: { createdAt: { lte: filters.staleQuoteCutoff } } },
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {

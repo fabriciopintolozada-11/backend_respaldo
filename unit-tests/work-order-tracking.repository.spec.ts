@@ -51,6 +51,24 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     expect(prisma.workOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
   });
 
+  it('filters stale quotes at the database level when a cutoff is provided (US-16 / BE-T16.3)', async () => {
+    prisma.workOrder.findMany.mockResolvedValue([]);
+    prisma.user.findMany.mockResolvedValue([]);
+    const cutoff = new Date('2026-08-22T00:00:00Z');
+
+    await repo.findTrackingSummary({ staleQuoteCutoff: cutoff, licensePlate: '4589-KXA' });
+
+    expect(prisma.workOrder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          vehicle: { is: { plate: '4589-KXA' } },
+          status: 'PRESUPUESTO_ENVIADO',
+          quote: { is: { createdAt: { lte: cutoff } } },
+        },
+      }),
+    );
+  });
+
   it('resolves mechanic names from the users table (seed convention) and returns bay data', async () => {
     prisma.workOrder.findMany.mockResolvedValue([orderRow]);
     prisma.user.findMany.mockResolvedValue([{ id: 'mech-1', fullName: 'Mecánico Uno' }]);

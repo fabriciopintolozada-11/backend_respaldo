@@ -41,4 +41,25 @@ describe('QueryTrackingWorkOrdersDto (US-05 / BE-T05.1)', () => {
       expect(errors).toHaveLength(0);
     }
   });
+
+  it('coerces onlyStaleQuotes from a "true" query string to a boolean (US-16 / BE-T16.3)', async () => {
+    const dto = createDto({ onlyStaleQuotes: 'true' });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.onlyStaleQuotes).toBe(true);
+  });
+
+  it('coerces onlyStaleQuotes from a "false" query string to a boolean', async () => {
+    const dto = createDto({ onlyStaleQuotes: 'false' });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.onlyStaleQuotes).toBe(false);
+  });
+
+  it('leaves onlyStaleQuotes undefined when it is not present', async () => {
+    const dto = createDto({});
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.onlyStaleQuotes).toBeUndefined();
+  });
 });
