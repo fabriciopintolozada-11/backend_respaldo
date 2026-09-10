@@ -14,6 +14,8 @@ import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
+import { CompleteWorkOrderDto } from './dto/complete-work-order.dto';
+import { CompleteWorkOrderResponseDto } from './dto/complete-work-order.response.dto';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
@@ -118,5 +120,25 @@ export class WorkOrdersController {
     @Req() request: Request,
   ): Promise<AwaitingPartResponseDto> {
     return this.service.setAwaitingPart(id, request.user.id, request.user.role, dto);
+  }
+
+  // US-19: conclude a repair, set the work order to LISTO_ENTREGA and free its
+  // physical bay. Only the assigned mechanic or the workshop lead can trigger
+  // this transition (BE-T19.2, RN-04, RN-05, RN-14, RN-19).
+  @Post('work-orders/:id/complete')
+  @Roles(UserRole.MECHANIC, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Conclude a repair, set the work order to LISTO_ENTREGA and release its bay (US-19, RN-05, RN-14, RN-19)' })
+  @ApiResponse({ status: 200, type: CompleteWorkOrderResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role or work order not assigned to this mechanic (RN-04)' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status' })
+  @ApiResponse({ status: 422, description: 'Work order is awaiting spare parts and cannot be concluded (RN-05)' })
+  complete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteWorkOrderDto,
+    @Req() request: Request,
+  ): Promise<CompleteWorkOrderResponseDto> {
+    return this.service.complete(id, request.user.id, request.user.role, dto);
   }
 }
