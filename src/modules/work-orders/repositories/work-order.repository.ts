@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
+import { DeliverWorkOrderDto } from '../dto/deliver-work-order.dto';
+import { DeliverWorkOrderResponseDto } from '../dto/deliver-work-order.response.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
@@ -685,6 +687,128 @@ export class WorkOrderRepository {
         bayNumber: bay?.bayNumber ?? null,
         finalMileage: dto.finalMileage ?? null,
         closingNotes: dto.closingNotes ?? null,
+      };
+    });
+  }
+
+  // US-20: read the context needed to build the consolidated settlement
+  // (RN-21). Financial fields are exposed only to RECEPTIONIST/ADMIN roles
+  // through the settlement DTO (BE-12, RN-21). Includes vehicle, customer,
+  // the approved quote totals and the spare part lines.
+  findSettlementContext(workOrderId: string) {
+    return this.prisma.workOrder.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        status: true,
+        deliveredAt: true,
+        vehicleId: true,
+        vehicle: { select: { plate: true, brand: true, model: true, year: true } },
+        customer: { select: { name: true } },
+        quote: {
+          select: {
+            laborSubtotal: true,
+            partsSubtotal: true,
+            currency: true,
+            parts: {
+              select: {
+                id: true,
+                status: true,
+                quantity: true,
+                unitPrice: true,
+                subtotal: true,
+                sparePart: { select: { code: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // US-20 / BE-16 / RN-21 / RN-19: atomically settle and deliver a vehicle.
+  // The status transition to ENTREGADO, the handover timestamp, the payment
+  // data, the charged total and the immutable technical history entry all run
+  // inside a single Prisma transaction (BE-16).
+  deliverWorkOrder(
+    workOrderId: string,
+    userId: string,
+    dto: DeliverWorkOrderDto,
+  ): Promise<DeliverWorkOrderResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const order = await transaction.workOrder.findUnique({
+        where: { id: workOrderId },
+        select: {
+          id: true,
+          vehicleId: true,
+          status: true,
+          deliveredAt: true,
+          quote: {
+            select: {
+              laborSubtotal: true,
+              currency: true,
+              parts: {
+                where: { status: 'INSTALLED' },
+                select: { subtotal: true },
+              },
+            },
+          },
+        },
+      });
+      if (!order) throw new NotFoundException('Work order not found');
+      // Defensive guard inside the transaction (BE-16): prevents a concurrent
+      // double settlement of the same work order (RN-21).
+      if (order.status !== 'LISTO_ENTREGA') {
+        throw new ConflictException('Work order must be in LISTO_ENTREGA to be delivered');
+      }
+      if (order.deliveredAt) {
+        throw new ConflictException('Work order has already been delivered');
+      }
+
+      // RN-21: total = approved labor subtotal + installed parts subtotal.
+      const laborSubtotal = order.quote?.laborSubtotal ?? new Prisma.Decimal(0);
+      const partsSubtotal = (order.quote?.parts ?? []).reduce(
+        (sum, part) => sum.plus(part.subtotal),
+        new Prisma.Decimal(0),
+      );
+      const totalCharged = laborSubtotal.plus(partsSubtotal);
+
+      const deliveredAt = new Date();
+      await transaction.workOrder.update({
+        where: { id: workOrderId },
+        data: {
+          status: 'ENTREGADO',
+          deliveredAt,
+          paymentMethod: dto.paymentMethod,
+          receiptNumber: dto.receiptNumber,
+          totalCharged,
+          ...(dto.deliveryNotes ? { deliveryNotes: dto.deliveryNotes } : {}),
+        },
+      });
+
+      // RN-19: permanent, immutable technical history entry documenting the
+      // settlement and the handover.
+      await transaction.technicalHistory.create({
+        data: {
+          vehicleId: order.vehicleId,
+          description:
+            `Work order ${workOrderId} delivered. Payment: ${dto.paymentMethod}, receipt: ` +
+            `${dto.receiptNumber}, charged: ${order.quote?.currency ?? 'BOB'} ` +
+            `${totalCharged.toString()}. Delivered by user ${userId}`,
+        },
+      });
+
+      // RN-21 / BE-13: return the agreed allowlist. The charged total is
+      // serialized as a string with the DECIMAL(12,2) scale to avoid float
+      // precision loss and inconsistent trailing zeros.
+      return {
+        id: workOrderId,
+        status: 'ENTREGADO',
+        deliveredAt,
+        paymentMethod: dto.paymentMethod,
+        receiptNumber: dto.receiptNumber,
+        totalCharged: totalCharged.toFixed(2),
+        deliveryNotes: dto.deliveryNotes ?? null,
       };
     });
   }
