@@ -74,6 +74,9 @@ model WorkOrder {
   @@index([vehicleId])
   @@index([status])
   @@index([mechanicId])
+  // BE-T05.4: composite indexes for the tracking/history lookups (US-05).
+  @@index([status, createdAt])
+  @@index([vehicleId, status])
   @@map("work_orders")
 }
 
