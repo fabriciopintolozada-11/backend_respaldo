@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './modules/auth/auth.module';
 import { AssignedOrdersModule } from './modules/work-orders/assigned-orders.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -10,6 +11,7 @@ import Joi from 'joi';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
 import { WorkBaysModule } from './modules/work-bays/work-bays.module';
+import { PublicTrackingModule } from './modules/public-tracking/public-tracking.module';
 
 @Module({
   imports: [
@@ -21,13 +23,20 @@ import { WorkBaysModule } from './modules/work-bays/work-bays.module';
         JWT_REFRESH_SECRET: Joi.string().min(32).required() 
       }) 
     }), 
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 10,
+      },
+    ]),
     JwtModule.register({}), 
     PrismaModule, 
     AssignedOrdersModule, 
     AuthModule, 
     QuotesModule, 
     SparePartsModule,
-    WorkBaysModule
+    WorkBaysModule,
+    PublicTrackingModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
