@@ -16,6 +16,9 @@ async function createUsers() {
     { id: '00000000-0000-4000-8000-000000000010', username: 'recep01', fullName: 'Recepcionista Uno', role: 'RECEPTIONIST' },
     { id: '11111111-1111-4111-8111-111111111111', username: 'mech01', fullName: 'Mecánico Uno', role: 'MECHANIC' },
     { id: '22222222-2222-4222-8222-222222222222', username: 'mech02', fullName: 'Mecánico Dos', role: 'MECHANIC' },
+    { id: '33333333-3333-4333-8333-333333333333', username: 'mech03', fullName: 'Mecánico Tres', role: 'MECHANIC' },
+    { id: '44444444-4444-4444-8444-444444444444', username: 'mech04', fullName: 'Mecánico Cuatro', role: 'MECHANIC' },
+    { id: '55555555-5555-4555-8555-555555555555', username: 'mech05', fullName: 'Mecánico Cinco', role: 'MECHANIC' },
     { id: '00000000-0000-4000-8000-000000000040', username: 'lead01', fullName: 'Jefe de Taller', role: 'WORKSHOP_LEAD' },
     { id: '00000000-0000-4000-8000-000000000050', username: 'admin01', fullName: 'Administrador', role: 'ADMIN' },
   ];
@@ -56,11 +59,14 @@ async function main() {
   await createUsers();
   const mechanicA = '11111111-1111-4111-8111-111111111111'; // mech01
   const mechanicB = '22222222-2222-4222-8222-222222222222'; // mech02
+  const mechanicC = '33333333-3333-4333-8333-333333333333'; // mech03
+  const mechanicD = '44444444-4444-4444-8444-444444444444'; // mech04
+  const mechanicE = '55555555-5555-4555-8555-555555555555'; // mech05
   const receptionistId = '00000000-0000-4000-8000-000000000010'; // recep01
 
   // 2. Mecánicos (upsert via createMany con skipDuplicates)
   await prisma.mechanic.createMany({
-    data: [{ id: mechanicA }, { id: mechanicB }],
+    data: [{ id: mechanicA }, { id: mechanicB }, { id: mechanicC }, { id: mechanicD }, { id: mechanicE }],
     skipDuplicates: true,
   });
 
@@ -278,7 +284,7 @@ async function main() {
   }
 
   console.log('✅ Seed completado (additive — sin borrar datos existentes):');
-  console.log(`   - 5 usuarios (contraseña: Fratelli2026!)`);
+  console.log(`   - 5 mecánicos + 1 jefe de taller + 1 recepcionista + 1 administrador (8 usuarios, contraseña: Fratelli2026!)`);
   console.log(`   - ${customers.length} clientes`);
   console.log(`   - ${vehicles.length} vehículos`);
   console.log(`   - ${workOrders.length} órdenes de trabajo`);
