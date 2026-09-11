@@ -1,7 +1,9 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
 import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
 import { Prisma } from '../src/generated/prisma/client';
+import { ApplyDiscountDto } from '../src/modules/work-orders/dto/apply-discount.dto';
+import { VoidAdjustmentDto } from '../src/modules/work-orders/dto/void-adjustment.dto';
 
 // US-20 / BE-16 / RN-21 / RN-19: the repository settles and delivers a
 // vehicle as one atomic Prisma transaction. These tests assert the ENTREGADO
@@ -33,8 +35,17 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
               { subtotal: new Prisma.Decimal('100.00') },
             ],
           },
+          settlementAdjustments: [],
         }),
         update: jest.fn().mockResolvedValue(undefined),
+      },
+      settlementAdjustment: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: 'adj-mock', createdAt: new Date(), ...data }),
+        ),
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
       technicalHistory: { create: jest.fn().mockResolvedValue(undefined) },
       ...overrides,
@@ -71,7 +82,7 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
     expect(tx.technicalHistory.create).toHaveBeenCalledWith({
       data: {
         vehicleId: VEHICLE_ID,
-        description: expect.stringContaining('charged: BOB 950'),
+        description: expect.stringContaining('Charged: BOB 950.00'),
       },
     });
     expect(tx.technicalHistory.create).toHaveBeenCalledWith({
@@ -100,6 +111,7 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
           status: 'LISTO_ENTREGA',
           deliveredAt: null,
           quote: null,
+          settlementAdjustments: [],
         }),
         update: jest.fn().mockResolvedValue(undefined),
       },
@@ -144,6 +156,7 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
           status: 'EN_REPARACION',
           deliveredAt: null,
           quote: null,
+          settlementAdjustments: [],
         }),
         update: jest.fn(),
       },
@@ -165,6 +178,7 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
           status: 'ENTREGADO',
           deliveredAt: new Date('2026-09-10T15:00:00.000Z'),
           quote: null,
+          settlementAdjustments: [],
         }),
         update: jest.fn(),
       },
@@ -175,5 +189,155 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
       .rejects.toThrow(ConflictException);
     expect(tx.workOrder.update).not.toHaveBeenCalled();
     expect(tx.technicalHistory.create).not.toHaveBeenCalled();
+  });
+
+  describe('applyDiscount', () => {
+    const DISCOUNT_DTO: ApplyDiscountDto = { amount: 50, reason: 'Descuento por demora en entrega del vehiculo' };
+
+    it('creates a DISCOUNT adjustment and technicalHistory entry (RN-15, RN-19)', async () => {
+      const tx = makeTx();
+      const { repository } = makeRepository(tx);
+
+      const result = await repository.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO);
+
+      expect(tx.settlementAdjustment.create).toHaveBeenCalledWith({
+        data: {
+          workOrderId: WORK_ORDER_ID,
+          type: 'DISCOUNT',
+          amount: expect.any(Prisma.Decimal),
+          reason: 'Descuento por demora en entrega del vehiculo',
+          appliedBy: USER_ID,
+        },
+      });
+      expect(tx.technicalHistory.create).toHaveBeenCalled();
+      expect(result.type).toBe('DISCOUNT');
+      expect(result.amount).toBe('50.00');
+    });
+
+    it('rejects a missing work order (404) and writes nothing', async () => {
+      const tx = makeTx({
+        workOrder: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn() },
+      });
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO))
+        .rejects.toThrow(NotFoundException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non LISTO_ENTREGA order with 409', async () => {
+      const tx = makeTx({
+        workOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: WORK_ORDER_ID, vehicleId: VEHICLE_ID, status: 'EN_REPARACION',
+            deliveredAt: null, quote: null, settlementAdjustments: [],
+          }),
+          update: jest.fn(),
+        },
+      });
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO))
+        .rejects.toThrow(ConflictException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a discount amount exceeding the available total (422, RN-15)', async () => {
+      const tx = makeTx();
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.applyDiscount(WORK_ORDER_ID, USER_ID, { amount: 5000, reason: 'Descuento que excede el total de la liquidacion' }))
+        .rejects.toThrow(UnprocessableEntityException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+      expect(tx.technicalHistory.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('voidAdjustment', () => {
+    const VOID_DTO: VoidAdjustmentDto = { adjustmentId: 'adj-1', reason: 'Error en el calculo del descuento original' };
+
+    it('creates a VOID adjustment and technicalHistory entry (RN-15, RN-19)', async () => {
+      const tx = makeTx({
+        settlementAdjustment: {
+          create: jest.fn().mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'void-mock', createdAt: new Date(), ...data }),
+          ),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'adj-1', workOrderId: WORK_ORDER_ID, type: 'DISCOUNT',
+            amount: new Prisma.Decimal('50.00'), reason: 'Original',
+          }),
+          findFirst: jest.fn().mockResolvedValue(null),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      });
+      const { repository } = makeRepository(tx);
+
+      const result = await repository.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO);
+
+      expect(tx.settlementAdjustment.create).toHaveBeenCalledWith({
+        data: {
+          workOrderId: WORK_ORDER_ID,
+          type: 'VOID',
+          amount: expect.any(Prisma.Decimal),
+          reason: expect.stringContaining('VOID of adjustment adj-1'),
+          appliedBy: USER_ID,
+        },
+      });
+      expect(tx.technicalHistory.create).toHaveBeenCalled();
+      expect(result.type).toBe('VOID');
+    });
+
+    it('rejects when the adjustment does not belong to this work order (404)', async () => {
+      const tx = makeTx({
+        settlementAdjustment: {
+          create: jest.fn(),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'adj-1', workOrderId: 'other-order', type: 'DISCOUNT',
+            amount: new Prisma.Decimal('50.00'),
+          }),
+        },
+      });
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO))
+        .rejects.toThrow(NotFoundException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects voiding a non-DISCOUNT adjustment (409)', async () => {
+      const tx = makeTx({
+        settlementAdjustment: {
+          create: jest.fn(),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'adj-1', workOrderId: WORK_ORDER_ID, type: 'VOID',
+            amount: new Prisma.Decimal('50.00'),
+          }),
+        },
+      });
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO))
+        .rejects.toThrow(ConflictException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects voiding an already voided discount (409)', async () => {
+      const tx = makeTx({
+        settlementAdjustment: {
+          create: jest.fn(),
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'adj-1', workOrderId: WORK_ORDER_ID, type: 'DISCOUNT',
+            amount: new Prisma.Decimal('50.00'),
+          }),
+          findFirst: jest.fn().mockResolvedValue({ id: 'void-9' }),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      });
+      const { repository } = makeRepository(tx);
+
+      await expect(repository.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO))
+        .rejects.toThrow(ConflictException);
+      expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
+    });
   });
 });

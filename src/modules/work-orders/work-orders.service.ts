@@ -23,6 +23,9 @@ import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response
 import type { VehicleHistoryRow } from './repositories/work-order.repository';
 import { VehicleHistoryConsumedPartDto, VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
 import { Prisma } from '../../generated/prisma/client';
+import { ApplyDiscountDto } from './dto/apply-discount.dto';
+import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
+import { SettlementAdjustmentResponseDto, AdjustmentType } from './dto/settlement-adjustment.response.dto';
 
 function elapsedDays(since: Date, now: number): number {
   return Math.max(0, Math.floor((now - since.getTime()) / 86_400_000));
@@ -366,6 +369,18 @@ export class WorkOrdersService {
     );
     const laborSubtotal = context.quote?.laborSubtotal ?? new Prisma.Decimal(0);
 
+    // RN-15: calculate active discounts from settlement adjustments
+    const activeDiscounts = (context.settlementAdjustments ?? []).reduce(
+      (sum, adj) => {
+        if (adj.type === 'DISCOUNT') return sum.plus(adj.amount);
+        if (adj.type === 'VOID') return sum.minus(adj.amount);
+        return sum;
+      },
+      new Prisma.Decimal(0),
+    );
+    const total = partsSubtotal.plus(laborSubtotal);
+    const totalAfterDiscounts = total.minus(activeDiscounts);
+
     return {
       workOrderId: context.id,
       status: context.status,
@@ -384,8 +399,17 @@ export class WorkOrdersService {
         subtotal: part.subtotal.toFixed(2),
       })),
       partsSubtotal: partsSubtotal.toFixed(2),
-      total: partsSubtotal.plus(laborSubtotal).toFixed(2),
+      total: total.toFixed(2),
       currency: context.quote?.currency ?? 'BOB',
+      discountsTotal: activeDiscounts.toFixed(2),
+      totalAfterDiscounts: totalAfterDiscounts.toFixed(2),
+      adjustments: (context.settlementAdjustments ?? []).map((adj) => ({
+        id: adj.id,
+        type: adj.type as AdjustmentType,
+        amount: adj.amount.toFixed(2),
+        reason: adj.reason,
+        createdAt: adj.createdAt,
+      })),
     };
   }
 
@@ -411,5 +435,45 @@ export class WorkOrdersService {
     }
 
     return this.repository.deliverWorkOrder(workOrderId, userId, dto);
+  }
+
+  // US-20 / RN-15: apply a discount to the settlement. Only WORKSHOP_LEAD
+  // may perform this operation. All rules live in the service (BE-06); the
+  // repository performs the atomic persistence (BE-16).
+  async applyDiscount(
+    workOrderId: string,
+    userId: string,
+    dto: ApplyDiscountDto,
+  ): Promise<SettlementAdjustmentResponseDto> {
+    const context = await this.repository.findSettlementContext(workOrderId);
+    if (!context) throw new NotFoundException('Work order not found');
+
+    if (context.status !== 'LISTO_ENTREGA') {
+      throw new ConflictException('Work order must be in LISTO_ENTREGA to apply discounts');
+    }
+    if (context.deliveredAt) {
+      throw new ConflictException('Work order has already been delivered');
+    }
+
+    return this.repository.applyDiscount(workOrderId, userId, dto);
+  }
+
+  // US-20 / RN-15: void a previously applied discount on the settlement.
+  async voidAdjustment(
+    workOrderId: string,
+    userId: string,
+    dto: VoidAdjustmentDto,
+  ): Promise<SettlementAdjustmentResponseDto> {
+    const context = await this.repository.findSettlementContext(workOrderId);
+    if (!context) throw new NotFoundException('Work order not found');
+
+    if (context.status !== 'LISTO_ENTREGA') {
+      throw new ConflictException('Work order must be in LISTO_ENTREGA to void adjustments');
+    }
+    if (context.deliveredAt) {
+      throw new ConflictException('Work order has already been delivered');
+    }
+
+    return this.repository.voidAdjustment(workOrderId, userId, dto);
   }
 }

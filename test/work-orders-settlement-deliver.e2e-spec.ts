@@ -16,6 +16,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
   let receptionistAuthorization: string;
   let adminAuthorization: string;
   let mechanicAuthorization: string;
+  let workshopLeadAuthorization: string;
 
   let customerId: string;
   let vehicleId: string;
@@ -23,6 +24,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
   let reservedOnlyOrderId: string;
   let notReadyOrderId: string;
   let noQuoteOrderId: string;
+  let discountableOrderId: string;
   let sparePartIds: string[] = [];
 
   const testIdentification = `E2E-DELIVER-${Date.now()}`;
@@ -30,6 +32,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
   const receptionistId = '00000000-0000-4000-8000-000000000010';
   const adminId = '00000000-0000-4000-8000-000000000050';
   const mechanicId = '11111111-1111-4111-8111-111111111111';
+  const workshopLeadId = '22222222-2222-4222-8222-222222222222';
   const now = Date.now();
 
   beforeAll(async () => {
@@ -47,6 +50,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     receptionistAuthorization = `Bearer ${jwtService.sign({ sub: receptionistId, role: UserRole.RECEPTIONIST }, { secret: process.env.JWT_SECRET })}`;
     adminAuthorization = `Bearer ${jwtService.sign({ sub: adminId, role: UserRole.ADMIN }, { secret: process.env.JWT_SECRET })}`;
     mechanicAuthorization = `Bearer ${jwtService.sign({ sub: mechanicId, role: UserRole.MECHANIC }, { secret: process.env.JWT_SECRET })}`;
+    workshopLeadAuthorization = `Bearer ${jwtService.sign({ sub: workshopLeadId, role: UserRole.WORKSHOP_LEAD }, { secret: process.env.JWT_SECRET })}`;
 
     const customer = await prisma.customer.create({ data: { identification: testIdentification, name: 'Cliente e2e deliver' } });
     customerId = customer.id;
@@ -79,6 +83,8 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     notReadyOrderId = notReadyOrder.id;
     const noQuoteOrder = await createOrder('Deliver e2e sin presupuesto', 'LISTO_ENTREGA');
     noQuoteOrderId = noQuoteOrder.id;
+    const discountableOrder = await createOrder('Deliver e2e con descuento', 'LISTO_ENTREGA');
+    discountableOrderId = discountableOrder.id;
 
     const readyQuote = await prisma.quote.create({
       data: {
@@ -111,10 +117,26 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     });
 
     expect(readyQuote.id).toBeDefined();
+
+    await prisma.quote.create({
+      data: {
+        workOrderId: discountableOrderId,
+        laborSubtotal: new Prisma.Decimal('650.00'),
+        partsSubtotal: new Prisma.Decimal('300.00'),
+        total: new Prisma.Decimal('950.00'),
+        parts: {
+          create: [
+            { sparePartId: installed1.id, quantity: 1, unitPrice: new Prisma.Decimal('200.00'), subtotal: new Prisma.Decimal('200.00'), status: 'INSTALLED' },
+            { sparePartId: installed2.id, quantity: 1, unitPrice: new Prisma.Decimal('100.00'), subtotal: new Prisma.Decimal('100.00'), status: 'INSTALLED' },
+          ],
+        },
+      },
+    });
   });
 
   afterAll(async () => {
-    const orderIds = [readyOrderId, reservedOnlyOrderId, notReadyOrderId, noQuoteOrderId];
+    const orderIds = [readyOrderId, reservedOnlyOrderId, notReadyOrderId, noQuoteOrderId, discountableOrderId];
+    await prisma.settlementAdjustment.deleteMany({ where: { workOrderId: { in: orderIds } } });
     await prisma.quotePart.deleteMany({ where: { sparePartId: { in: sparePartIds } } });
     await prisma.quote.deleteMany({ where: { workOrderId: { in: orderIds } } });
     await prisma.workOrder.deleteMany({ where: { vehicleId } });
@@ -221,7 +243,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       where: { vehicleId, description: { contains: `receipt: F2026-E2E-001` } },
     });
     const adminHistory = await prisma.technicalHistory.findFirst({
-      where: { vehicleId, description: { contains: `charged: BOB` } },
+      where: { vehicleId, description: { contains: `Charged: BOB` } },
     });
     expect(history).toBeDefined();
     expect(adminHistory).toBeDefined();
@@ -294,5 +316,124 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       .set('Authorization', receptionistAuthorization)
       .send({ paymentMethod: 'CASH', receiptNumber: 'F2026-E2E-008' })
       .expect(404);
+  });
+
+  // --- RN-15: Settlement discount tests ---
+
+  it('WORKSHOP_LEAD can apply a discount and settlement reflects it (RN-15)', async () => {
+    const discountResponse = await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ amount: 50, reason: 'Descuento por demora en entrega del vehiculo' })
+      .expect(200);
+
+    expect(discountResponse.body.type).toBe('DISCOUNT');
+    expect(discountResponse.body.amount).toBe('50.00');
+    expect(discountResponse.body.appliedBy).toBe(workshopLeadId);
+
+    const settlementResponse = await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/${discountableOrderId}/settlement`)
+      .set('Authorization', workshopLeadAuthorization)
+      .expect(200);
+
+    expect(settlementResponse.body.discountsTotal).toBe('50.00');
+    expect(settlementResponse.body.totalAfterDiscounts).toBe('900.00');
+    expect(settlementResponse.body.adjustments).toHaveLength(1);
+    expect(settlementResponse.body.adjustments[0].type).toBe('DISCOUNT');
+  });
+
+  it('RECEPTIONIST cannot apply a discount (403, RN-15)', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', receptionistAuthorization)
+      .send({ amount: 10, reason: 'Descuento no autorizado por recepcionista' })
+      .expect(403);
+  });
+
+  it('MECHANIC cannot apply a discount (403, RN-15)', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', mechanicAuthorization)
+      .send({ amount: 10, reason: 'Descuento no autorizado por mecanico' })
+      .expect(403);
+  });
+
+  it('rejects discount exceeding the total with 422 (RN-15)', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ amount: 1000, reason: 'Descuento que excede el total de la liquidacion' })
+      .expect(422);
+  });
+
+  it('WORKSHOP_LEAD can void a discount and the settlement recalculates (RN-15)', async () => {
+    const settlementBefore = await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/${discountableOrderId}/settlement`)
+      .set('Authorization', workshopLeadAuthorization)
+      .expect(200);
+
+    const adjustmentId = settlementBefore.body.adjustments[0].id;
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/void-adjustment`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ adjustmentId, reason: 'Error en el calculo del descuento original' })
+      .expect(200);
+
+    const settlementAfter = await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/${discountableOrderId}/settlement`)
+      .set('Authorization', workshopLeadAuthorization)
+      .expect(200);
+
+    expect(settlementAfter.body.discountsTotal).toBe('0.00');
+    expect(settlementAfter.body.totalAfterDiscounts).toBe('950.00');
+    expect(settlementAfter.body.adjustments).toHaveLength(2);
+  });
+
+  it('rejects void for a non-existent adjustment (404)', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/void-adjustment`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ adjustmentId: '00000000-0000-4000-8000-000000000999', reason: 'Intento de anular ajuste que no existe en el sistema' })
+      .expect(404);
+  });
+
+  it('delivers with the discount-adjusted total (RN-15, RN-21)', async () => {
+    // Apply a new discount after the void
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ amount: 30, reason: 'Descuento por cliente frecuente autorizado' })
+      .expect(200);
+
+    const deliverResponse = await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/deliver`)
+      .set('Authorization', receptionistAuthorization)
+      .send({ paymentMethod: 'CASH', receiptNumber: 'F2026-E2E-DISC-001' })
+      .expect(200);
+
+    expect(deliverResponse.body.status).toBe('ENTREGADO');
+    expect(new Prisma.Decimal(deliverResponse.body.totalCharged).equals(new Prisma.Decimal('920.00'))).toBe(true);
+  });
+
+  it('WORKSHOP_LEAD can view settlement of a LISTO_ENTREGA order (RN-15)', async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/${notReadyOrderId}/settlement`)
+      .set('Authorization', workshopLeadAuthorization)
+      .expect(409);
+  });
+
+  it('rejects discount with amount zero or negative (400)', async () => {
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ amount: 0, reason: 'Descuento invalido con monto cero' })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/work-orders/${discountableOrderId}/settlement/apply-discount`)
+      .set('Authorization', workshopLeadAuthorization)
+      .send({ amount: -10, reason: 'Descuento invalido con monto negativo' })
+      .expect(400);
   });
 });

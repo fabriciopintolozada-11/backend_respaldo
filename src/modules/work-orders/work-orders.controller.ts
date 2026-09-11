@@ -25,6 +25,9 @@ import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
 import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response.dto';
 import { VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
+import { ApplyDiscountDto } from './dto/apply-discount.dto';
+import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
+import { SettlementAdjustmentResponseDto } from './dto/settlement-adjustment.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -165,9 +168,10 @@ export class WorkOrdersController {
   }
 
   // US-20: consolidated settlement (RN-21) of a work order ready to be
-  // delivered. Only RECEPTIONIST and ADMIN see the monetary values (BE-12).
+  // delivered. Only RECEPTIONIST, ADMIN and WORKSHOP_LEAD see the monetary
+  // values (BE-12). WORKSHOP_LEAD needs it to apply discounts (RN-15).
   @Get('work-orders/:id/settlement')
-  @Roles(UserRole.RECEPTIONIST, UserRole.ADMIN)
+  @Roles(UserRole.RECEPTIONIST, UserRole.ADMIN, UserRole.WORKSHOP_LEAD)
   @ApiOperation({ summary: 'Get the consolidated settlement in BOB for a ready work order (US-20, RN-21)' })
   @ApiResponse({ status: 200, type: WorkOrderSettlementResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
@@ -195,5 +199,43 @@ export class WorkOrdersController {
     @Req() request: Request,
   ): Promise<DeliverWorkOrderResponseDto> {
     return this.service.deliver(id, request.user.id, dto);
+  }
+
+  // US-20 / RN-15: apply a discount to the settlement. Only WORKSHOP_LEAD
+  // may perform this operation (RN-15). The total is always computed by the
+  // backend; the client only sends the discount amount and reason (BE-13).
+  @Post('work-orders/:id/settlement/apply-discount')
+  @Roles(UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apply a discount to the settlement (US-20, RN-15)' })
+  @ApiResponse({ status: 200, type: SettlementAdjustmentResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation (RN-15)' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA or already delivered' })
+  @ApiResponse({ status: 422, description: 'Discount amount exceeds the available total (RN-15)' })
+  applyDiscount(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ApplyDiscountDto,
+    @Req() request: Request,
+  ): Promise<SettlementAdjustmentResponseDto> {
+    return this.service.applyDiscount(id, request.user.id, dto);
+  }
+
+  // US-20 / RN-15: void (reverse) a previously applied discount on the
+  // settlement. Only WORKSHOP_LEAD may perform this operation (RN-15).
+  @Post('work-orders/:id/settlement/void-adjustment')
+  @Roles(UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Void a previously applied discount (US-20, RN-15)' })
+  @ApiResponse({ status: 200, type: SettlementAdjustmentResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation (RN-15)' })
+  @ApiResponse({ status: 404, description: 'Work order or adjustment not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA, already delivered, or adjustment already voided' })
+  voidAdjustment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: VoidAdjustmentDto,
+    @Req() request: Request,
+  ): Promise<SettlementAdjustmentResponseDto> {
+    return this.service.voidAdjustment(id, request.user.id, dto);
   }
 }

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AdjustmentType } from './settlement-adjustment.response.dto';
 
 // US-20: a single installed spare part line of the settlement. Monetary
 // fields are serialized as strings to avoid float precision loss (BE-13).
@@ -20,6 +21,24 @@ export class WorkOrderSettlementPartItemDto {
 
   @ApiProperty({ description: 'Line subtotal in BOB, as a string' })
   subtotal!: string;
+}
+
+// US-20 / RN-15: summary of a single settlement adjustment for the settlement view.
+export class SettlementAdjustmentSummaryDto {
+  @ApiProperty({ description: 'Adjustment id' })
+  id!: string;
+
+  @ApiProperty({ enum: AdjustmentType, description: 'Adjustment type', example: 'DISCOUNT' })
+  type!: AdjustmentType;
+
+  @ApiProperty({ description: 'Adjustment amount in BOB, as a string' })
+  amount!: string;
+
+  @ApiProperty({ description: 'Reason for the adjustment' })
+  reason!: string;
+
+  @ApiProperty({ description: 'Timestamp when the adjustment was applied' })
+  createdAt!: Date;
 }
 
 // US-20: consolidated settlement of a work order ready to be delivered
@@ -61,4 +80,13 @@ export class WorkOrderSettlementResponseDto {
 
   @ApiProperty({ description: 'Settlement currency', example: 'BOB' })
   currency!: string;
+
+  @ApiProperty({ description: 'Total discounts applied in BOB, as a string' })
+  discountsTotal!: string;
+
+  @ApiProperty({ description: 'Final total after discounts in BOB, as a string' })
+  totalAfterDiscounts!: string;
+
+  @ApiProperty({ type: [SettlementAdjustmentSummaryDto], description: 'Applied adjustments history' })
+  adjustments!: SettlementAdjustmentSummaryDto[];
 }
