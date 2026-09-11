@@ -25,4 +25,17 @@ export class WorkOrderTrackingResponseDto {
     description: 'RN-06: the order has been awaiting quote approval for 15+ days',
   })
   isStaleQuote!: boolean;
+  // US-21 / BE-T21.1: an additional finding reported during repair (HU-11 /
+  // RN-03) is awaiting the reception decision. The reception card renders the
+  // badge "Ampliación de Presupuesto Pendiente" and the mechanic description.
+  @ApiProperty({
+    default: false,
+    description: 'US-21: the order has an additional finding pending quote approval',
+  })
+  hasPendingAdditionalFinding!: boolean;
+  @ApiProperty({
+    nullable: true,
+    description: 'US-21: description of the pending additional finding',
+  })
+  additionalFindingDescription!: string | null;
 }

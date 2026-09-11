@@ -29,7 +29,7 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   describe('successful confirmation', () => {

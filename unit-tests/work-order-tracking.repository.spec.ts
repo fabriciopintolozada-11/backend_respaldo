@@ -18,6 +18,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     currentBay: { id: 'bay-1', bayNumber: 1 },
     quote: null,
     inventoryDiscrepancies: [],
+    additionalFindings: [],
   };
 
   beforeEach(() => {
@@ -91,6 +92,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
       bayNumber: 1,
       quoteCreatedAt: null,
       discrepancy: null,
+      additionalFindingDescription: null,
     });
   });
 
@@ -127,6 +129,24 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     expect(result.mechanicName).toBeNull();
     expect(result.bayId).toBeNull();
     expect(result.bayNumber).toBeNull();
+  });
+
+  it('surfaces the latest pending additional finding description (US-21 / RN-03)', async () => {
+    prisma.workOrder.findMany.mockResolvedValue([
+      {
+        ...orderRow,
+        status: 'PRESUPUESTO_ENVIADO',
+        quote: { createdAt: new Date('2026-09-03T00:00:00Z') },
+        additionalFindings: [
+          { description: 'Fuga de aceite detectada en el motor' },
+        ],
+      },
+    ]);
+    prisma.user.findMany.mockResolvedValue([{ id: 'mech-1', fullName: 'Mecánico Uno' }]);
+
+    const [result] = await repo.findTrackingSummary({});
+
+    expect(result.additionalFindingDescription).toBe('Fuga de aceite detectada en el motor');
   });
 });
 

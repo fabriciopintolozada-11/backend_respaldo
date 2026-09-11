@@ -17,7 +17,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
       completeWorkOrder: jest.fn(),
     } as unknown as jest.Mocked<WorkOrderRepository>;
 
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   const dto: CompleteWorkOrderDto = {

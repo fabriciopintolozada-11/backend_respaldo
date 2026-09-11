@@ -21,12 +21,16 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     bayNumber: 1,
     quoteCreatedAt: null,
     discrepancy: null,
+    additionalFindingDescription: null,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
-    service = new WorkOrdersService(repository as unknown as WorkOrderRepository);
+    service = new WorkOrdersService(
+      repository as unknown as WorkOrderRepository,
+      { get: jest.fn() } as never,
+    );
   });
 
   afterEach(() => {
@@ -152,6 +156,32 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     expect(tracking.pausedReason).toBeNull();
     expect(tracking.daysWaitingApproval).toBeNull();
     expect(tracking.isStaleQuote).toBe(false);
+  });
+
+  it('flags a pending additional finding reported during repair (US-21 / RN-03)', async () => {
+    repository.findTrackingSummary.mockResolvedValue([
+      {
+        ...baseRow,
+        status: 'PRESUPUESTO_ENVIADO',
+        quoteCreatedAt: new Date('2026-09-03T00:00:00Z'),
+        additionalFindingDescription: 'Fuga de aceite detectada en el motor',
+      },
+    ]);
+
+    const [tracking] = await service.getTrackingSummary({});
+
+    expect(tracking.hasPendingAdditionalFinding).toBe(true);
+    expect(tracking.additionalFindingDescription).toBe('Fuga de aceite detectada en el motor');
+    expect(tracking.pausedReason).toBe('Awaiting customer approval');
+  });
+
+  it('does not flag the badge when the order has no pending additional finding', async () => {
+    repository.findTrackingSummary.mockResolvedValue([baseRow]);
+
+    const [tracking] = await service.getTrackingSummary({});
+
+    expect(tracking.hasPendingAdditionalFinding).toBe(false);
+    expect(tracking.additionalFindingDescription).toBeNull();
   });
 
   it('returns an empty list when no work orders match', async () => {
