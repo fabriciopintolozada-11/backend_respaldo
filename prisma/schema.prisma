@@ -75,6 +75,7 @@ model WorkOrder {
   notifications          Notification[]
   stockMovements         StockMovement[]
   inventoryDiscrepancies InventoryDiscrepancy[]
+  settlementAdjustments SettlementAdjustment[]
 
   @@index([vehicleId])
   @@index([status])
@@ -83,6 +84,22 @@ model WorkOrder {
   @@index([status, createdAt])
   @@index([vehicleId, status])
   @@map("work_orders")
+}
+
+// US-20 / RN-15: insert-only settlement adjustments (discounts and voids).
+// Follows the same immutable pattern as StockMovement (BE-17).
+model SettlementAdjustment {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid @map("id")
+  workOrderId String    @db.Uuid @map("work_order_id")
+  type        String    @db.VarChar(20) @map("type")
+  amount      Decimal   @db.Decimal(12, 2) @map("amount")
+  reason      String    @db.Text @map("reason")
+  appliedBy   String    @db.Uuid @map("applied_by")
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+
+  @@index([workOrderId])
+  @@map("settlement_adjustments")
 }
 
 model WorkBay {

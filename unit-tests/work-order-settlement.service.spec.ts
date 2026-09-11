@@ -3,6 +3,8 @@ import { WorkOrdersService } from '../src/modules/work-orders/work-orders.servic
 import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
 import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
 import { Prisma } from '../src/generated/prisma/client';
+import { ApplyDiscountDto } from '../src/modules/work-orders/dto/apply-discount.dto';
+import { VoidAdjustmentDto } from '../src/modules/work-orders/dto/void-adjustment.dto';
 
 describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
   let service: WorkOrdersService;
@@ -55,12 +57,15 @@ describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
         },
       ],
     },
+    settlementAdjustments: [],
   };
 
   beforeEach(() => {
     repository = {
       findSettlementContext: jest.fn(),
       deliverWorkOrder: jest.fn(),
+      applyDiscount: jest.fn(),
+      voidAdjustment: jest.fn(),
     } as unknown as jest.Mocked<WorkOrderRepository>;
 
     service = new WorkOrdersService(repository);
@@ -108,6 +113,40 @@ describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
       expect(result.parts).toEqual([]);
       expect(result.currency).toBe('BOB');
     });
+
+    it('includes discountsTotal, totalAfterDiscounts and adjustments when discounts exist (RN-15)', async () => {
+      const contextWithDiscounts = {
+        ...baseContext,
+        settlementAdjustments: [
+          { id: 'adj-1', type: 'DISCOUNT', amount: new Prisma.Decimal('50.00'), reason: 'Descuento por demora', appliedBy: USER_ID, createdAt: new Date() },
+          { id: 'void-1', type: 'VOID', amount: new Prisma.Decimal('50.00'), reason: 'VOID of adj-1', appliedBy: USER_ID, createdAt: new Date() },
+        ],
+      };
+      repository.findSettlementContext.mockResolvedValue(contextWithDiscounts);
+
+      const result = await service.getSettlement(WORK_ORDER_ID);
+
+      expect(result.discountsTotal).toBe('0.00');
+      expect(result.totalAfterDiscounts).toBe('950.00');
+      expect(result.adjustments).toHaveLength(2);
+    });
+
+    it('calculates correct total when multiple active discounts exist (RN-15)', async () => {
+      const contextMultipleDiscounts = {
+        ...baseContext,
+        settlementAdjustments: [
+          { id: 'adj-1', type: 'DISCOUNT', amount: new Prisma.Decimal('50.00'), reason: 'Descuento 1', appliedBy: USER_ID, createdAt: new Date() },
+          { id: 'adj-2', type: 'DISCOUNT', amount: new Prisma.Decimal('30.00'), reason: 'Descuento 2', appliedBy: USER_ID, createdAt: new Date() },
+        ],
+      };
+      repository.findSettlementContext.mockResolvedValue(contextMultipleDiscounts);
+
+      const result = await service.getSettlement(WORK_ORDER_ID);
+
+      expect(result.discountsTotal).toBe('80.00');
+      expect(result.totalAfterDiscounts).toBe('870.00');
+      expect(result.adjustments).toHaveLength(2);
+    });
   });
 
   describe('deliver', () => {
@@ -143,6 +182,104 @@ describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
       expect(repository.deliverWorkOrder).toHaveBeenCalledWith(WORK_ORDER_ID, USER_ID, DTO);
       expect(result.status).toBe('ENTREGADO');
       expect(result.totalCharged).toBe('950.00');
+    });
+
+    it('charges the total after discounts are applied (RN-15)', async () => {
+      const contextWithDiscounts = {
+        ...baseContext,
+        settlementAdjustments: [
+          { id: 'adj-1', type: 'DISCOUNT', amount: new Prisma.Decimal('50.00'), reason: 'Descuento', appliedBy: USER_ID, createdAt: new Date() },
+        ],
+      };
+      repository.findSettlementContext.mockResolvedValue(contextWithDiscounts);
+      repository.deliverWorkOrder.mockResolvedValue({
+        id: WORK_ORDER_ID,
+        status: 'ENTREGADO',
+        deliveredAt: new Date(),
+        paymentMethod: PaymentMethod.CASH,
+        receiptNumber: DTO.receiptNumber,
+        totalCharged: '900.00',
+        deliveryNotes: DTO.deliveryNotes ?? null,
+      });
+
+      const result = await service.deliver(WORK_ORDER_ID, USER_ID, DTO);
+
+      expect(result.totalCharged).toBe('900.00');
+    });
+  });
+
+  describe('applyDiscount', () => {
+    const DISCOUNT_DTO: ApplyDiscountDto = { amount: 50, reason: 'Descuento por demora en entrega' };
+
+    it('throws NotFoundException when work order does not exist', async () => {
+      repository.findSettlementContext.mockResolvedValue(null);
+      await expect(service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO)).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects a work order not in LISTO_ENTREGA with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'EN_REPARACION' });
+      await expect(service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO)).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects a delivered work order with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, deliveredAt: new Date() });
+      await expect(service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO)).rejects.toThrow(ConflictException);
+    });
+
+    it('delegates to the repository and returns the adjustment result', async () => {
+      repository.findSettlementContext.mockResolvedValue(baseContext);
+      repository.applyDiscount.mockResolvedValue({
+        id: 'adj-1',
+        workOrderId: WORK_ORDER_ID,
+        type: 'DISCOUNT' as any,
+        amount: '50.00',
+        reason: 'Descuento por demora en entrega',
+        appliedBy: USER_ID,
+        createdAt: new Date(),
+      });
+
+      const result = await service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO);
+
+      expect(repository.applyDiscount).toHaveBeenCalledWith(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO);
+      expect(result.type).toBe('DISCOUNT');
+      expect(result.amount).toBe('50.00');
+    });
+  });
+
+  describe('voidAdjustment', () => {
+    const VOID_DTO: VoidAdjustmentDto = { adjustmentId: 'adj-1', reason: 'Error en el calculo del descuento' };
+
+    it('throws NotFoundException when work order does not exist', async () => {
+      repository.findSettlementContext.mockResolvedValue(null);
+      await expect(service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO)).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects a work order not in LISTO_ENTREGA with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'APROBADO' });
+      await expect(service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO)).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects a delivered work order with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, deliveredAt: new Date() });
+      await expect(service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO)).rejects.toThrow(ConflictException);
+    });
+
+    it('delegates to the repository and returns the void result', async () => {
+      repository.findSettlementContext.mockResolvedValue(baseContext);
+      repository.voidAdjustment.mockResolvedValue({
+        id: 'void-1',
+        workOrderId: WORK_ORDER_ID,
+        type: 'VOID' as any,
+        amount: '50.00',
+        reason: 'VOID of adjustment adj-1: Error en el calculo del descuento',
+        appliedBy: USER_ID,
+        createdAt: new Date(),
+      });
+
+      const result = await service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO);
+
+      expect(repository.voidAdjustment).toHaveBeenCalledWith(WORK_ORDER_ID, USER_ID, VOID_DTO);
+      expect(result.type).toBe('VOID');
     });
   });
 });
