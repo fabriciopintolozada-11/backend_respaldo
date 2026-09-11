@@ -28,6 +28,9 @@ import { VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
 import { SettlementAdjustmentResponseDto } from './dto/settlement-adjustment.response.dto';
+import { ApproveAdditionalFindingDto } from './dto/approve-additional-finding.dto';
+import { RejectAdditionalFindingDto } from './dto/reject-additional-finding.dto';
+import { AdditionalFindingResponseDto } from './dto/additional-finding.response.dto';
 
 @ApiTags('work-orders')
 @Controller()
@@ -109,6 +112,47 @@ export class WorkOrdersController {
   @ApiResponse({ status: 201, type: DiagnosticResponseDto })
   createDiagnostic(@Param('id') id: string, @Body() dto: CreateDiagnosticDto, @Req() request: Request): Promise<DiagnosticResponseDto> {
     return this.service.createDiagnostic(id, request.user.id, dto);
+  }
+
+  // US-21 (BE-T21.2 / HU-09): approve the additional quote of an unforeseen
+  // finding reported during repair (RN-03). The suggested parts are reserved
+  // (RN-07) and the order resumes EN_REPARACION. Only RECEPTIONIST and
+  // WORKSHOP_LEAD may decide (BE-T21.2).
+  @Post('work-orders/:id/additional-findings/approve')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve the additional budget of an unforeseen finding and resume the repair (US-21, RN-03, RN-07, RN-19)' })
+  @ApiResponse({ status: 200, type: AdditionalFindingResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not awaiting an additional budget approval or already decided' })
+  @ApiResponse({ status: 422, description: 'Insufficient available stock for a suggested spare part (RN-07)' })
+  approveAdditionalFinding(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ApproveAdditionalFindingDto,
+    @Req() request: Request,
+  ): Promise<AdditionalFindingResponseDto> {
+    return this.service.approveAdditionalFinding(id, dto, request.user.id);
+  }
+
+  // US-21 (BE-T21.2 / RN-19): reject the additional quote. The finding is
+  // archived permanently as "Daño no reparado por decisión del cliente" and
+  // the order resumes EN_REPARACION to finish only the originally approved
+  // work. Only RECEPTIONIST and WORKSHOP_LEAD may decide (BE-T21.2).
+  @Post('work-orders/:id/additional-findings/reject')
+  @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject the additional budget and archive the damage as not repaired (US-21, RN-19)' })
+  @ApiResponse({ status: 200, type: AdditionalFindingResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not awaiting an additional budget approval or already decided' })
+  rejectAdditionalFinding(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectAdditionalFindingDto,
+    @Req() request: Request,
+  ): Promise<AdditionalFindingResponseDto> {
+    return this.service.rejectAdditionalFinding(id, dto, request.user.id);
   }
 
   @Post('work-orders/:id/consume-part')

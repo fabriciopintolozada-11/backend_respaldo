@@ -51,7 +51,7 @@ describe('WorkOrdersService.getVehicleHistory (US-05 / BE-T05.3)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository as unknown as WorkOrderRepository);
+    service = new WorkOrdersService(repository as unknown as WorkOrderRepository, { get: jest.fn() } as never);
   });
 
   it('throws 404 when the vehicle does not exist', async () => {

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { WorkOrdersService } from '../src/modules/work-orders/work-orders.service';
@@ -26,7 +27,7 @@ describe('WorkOrdersService (HU-01)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   describe('HU-01 Escenario 1: Registro exitoso de nuevo vehículo', () => {
@@ -95,7 +96,7 @@ describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   it('records a diagnosis for the assigned mechanic and moves the order to diagnosis', async () => {
@@ -105,7 +106,7 @@ describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
 
     await service.createDiagnostic('work-order-id', 'mechanic-id', diagnostic);
 
-    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'EN_DIAGNOSTICO');
+    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'EN_DIAGNOSTICO', 'mechanic-id');
   });
 
   it('suspends a repair when a diagnosis adds findings (RN-03)', async () => {
@@ -115,7 +116,7 @@ describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
 
     await service.createDiagnostic('work-order-id', 'mechanic-id', diagnostic);
 
-    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'PRESUPUESTO_ENVIADO');
+    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
   });
 
   it('rejects diagnosis when the mechanic is not assigned to the work order (RN-04)', async () => {
@@ -211,6 +212,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
       providers: [
         WorkOrdersService,
         { provide: WorkOrderRepository, useValue: repository },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
       ],
     }).compile();
     service = module.get(WorkOrdersService);
@@ -229,6 +231,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
           workOrderId,
           diagnostic,
           'EN_DIAGNOSTICO',
+          mechanicId,
         );
         expect(result.workOrderId).toBe(workOrderId);
         expect(result.description).toBe(diagnostic.description);
@@ -251,6 +254,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
           estimatedHours: diagnostic.estimatedHours,
         }),
         'EN_DIAGNOSTICO',
+        mechanicId,
       );
     });
   });
@@ -266,6 +270,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
         workOrderId,
         diagnostic,
         'PRESUPUESTO_ENVIADO',
+        mechanicId,
       );
     });
 

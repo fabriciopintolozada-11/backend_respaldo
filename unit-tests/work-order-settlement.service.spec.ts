@@ -68,7 +68,7 @@ describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
       voidAdjustment: jest.fn(),
     } as unknown as jest.Mocked<WorkOrderRepository>;
 
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   describe('getSettlement', () => {

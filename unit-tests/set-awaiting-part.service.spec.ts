@@ -19,7 +19,7 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
       setAwaitingPart: jest.fn(),
     } as unknown as jest.Mocked<WorkOrderRepository>;
 
-    service = new WorkOrdersService(repository);
+    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
   });
 
   const dto: SetAwaitingPartDto = {

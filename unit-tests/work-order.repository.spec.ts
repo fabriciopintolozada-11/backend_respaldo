@@ -120,6 +120,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
         update: jest.fn().mockResolvedValue({ vehicleId }),
       },
       technicalHistory: { create: jest.fn().mockResolvedValue(undefined) },
+      additionalFinding: { create: jest.fn().mockResolvedValue(undefined) },
     };
     const prisma = {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
@@ -160,7 +161,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
   it('suspends the order to PRESUPUESTO_ENVIADO inside the same transaction when there are additional findings (RN-03)', async () => {
     const { repository, tx } = buildFixture();
 
-    await repository.createDiagnostic(workOrderId, diagnostic, 'PRESUPUESTO_ENVIADO');
+    await repository.createDiagnostic(workOrderId, diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
 
     expect(tx.workOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -169,6 +170,31 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
       }),
     );
     expect(tx.technicalHistory.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures the reported finding as a pending additional quote annex (US-21 / RN-03)', async () => {
+    const { repository, tx } = buildFixture();
+
+    await repository.createDiagnostic(workOrderId, diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
+
+    expect(tx.additionalFinding.create).toHaveBeenCalledWith({
+      data: {
+        workOrderId,
+        description: diagnostic.description,
+        suggestedTasks: diagnostic.suggestedTasks,
+        suggestedPartIds: diagnostic.suggestedPartIds,
+        estimatedHours: diagnostic.estimatedHours,
+        reportedBy: 'mechanic-id',
+      },
+    });
+  });
+
+  it('does not create an annex until a new finding is reported during repair (HU-11 initial)', async () => {
+    const { repository, tx } = buildFixture();
+
+    await repository.createDiagnostic(workOrderId, diagnostic, 'EN_DIAGNOSTICO', 'mechanic-id');
+
+    expect(tx.additionalFinding.create).not.toHaveBeenCalled();
   });
 
   it('returns an explicit non-financial allowlist so no prices leak to the mechanic (RN-16)', async () => {

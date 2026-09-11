@@ -13,7 +13,7 @@ describe('WorkOrdersService HU-04 queries', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository as never);
+    service = new WorkOrdersService(repository as never, { get: jest.fn() } as never);
   });
 
   it('returns paginated work orders available for assignment', async () => {
