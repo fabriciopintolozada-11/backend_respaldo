@@ -69,6 +69,7 @@ describe('MechanicOrdersRepository (HU-03)', () => {
     prisma.workOrder.findFirst.mockResolvedValue({
       ...assignedRow,
       vehicle: { plate: '1234ABC', brand: 'Toyota', model: 'Corolla', year: 2020 },
+      additionalFindings: [{ status: 'PENDING_QUOTE' }],
     });
 
     const result = await repo.findAssignedDetail(mechanicId, 'wo-1');
@@ -81,6 +82,20 @@ describe('MechanicOrdersRepository (HU-03)', () => {
       expect.objectContaining({ brand: true, model: true, year: true }),
     );
     expect(result?.vehicle.plate).toBe('1234ABC');
+    expect(result?.additionalFindingStatus).toBe('PENDING_QUOTE');
+  });
+
+  it('selects only the status of the latest additional finding on the detail (FE-T21.3, US-21)', async () => {
+    prisma.workOrder.findFirst.mockResolvedValue(null);
+
+    await repo.findAssignedDetail(mechanicId, 'wo-1');
+
+    const select = prisma.workOrder.findFirst.mock.calls[0][0].select;
+    expect(select.additionalFindings).toEqual({
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+      select: { status: true },
+    });
   });
 
   it('returns null when the detail belongs to another mechanic (RN-04)', async () => {

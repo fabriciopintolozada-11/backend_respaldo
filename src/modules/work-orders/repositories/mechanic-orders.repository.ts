@@ -20,6 +20,9 @@ export interface AssignedQuoteRow {
 
 // HU-07: detail row of an assigned work order. quote exposes the spare parts
 // of the approved quote (with sparePartId, HU-13) without financial fields.
+// FE-T21.3 (US-21): additionalFindingStatus carries the decision state of the
+// latest additional finding (PENDING_QUOTE/APPROVED/REJECTED) or null when the
+// order has no annex. Only the status string is queried, never costs (RN-16).
 export interface AssignedWorkOrderDetailRow {
   id: string;
   vehicleId: string;
@@ -28,6 +31,7 @@ export interface AssignedWorkOrderDetailRow {
   assignedAt: Date | null;
   vehicle: { plate: string; brand: string; model: string; year: number };
   quote: AssignedQuoteRow | null;
+  additionalFindingStatus: 'PENDING_QUOTE' | 'APPROVED' | 'REJECTED' | null;
 }
 
 export interface AssignedWorkOrderRow {
@@ -88,8 +92,8 @@ export class MechanicOrdersRepository {
   // HU-07: returns the assigned work order detail together with the reserved
   // spare part lines of its approved quote (RN-07). Only non-financial fields
   // are selected so no price is ever exposed to a mechanic (RN-16 / BE-12).
-  findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailRow | null> {
-    return this.prisma.workOrder.findFirst({
+  async findAssignedDetail(mechanicId: string, workOrderId: string): Promise<AssignedWorkOrderDetailRow | null> {
+    const order = await this.prisma.workOrder.findFirst({
       where: { id: workOrderId, mechanicId },
       select: {
         id: true,
@@ -117,8 +121,25 @@ export class MechanicOrdersRepository {
             },
           },
         },
+        // US-21 / FE-T21.3: the latest additional finding so the mechanic leaf
+        // can reflect the reception decision. Only status, no monetary fields
+        // (RN-16). The relation already exists on the generated schema.
+        additionalFindings: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true },
+        },
       },
     });
+    if (!order) return null;
+
+    // Flatten the latests additional finding status into the row contract.
+    const { additionalFindings, ...rest } = order;
+    return {
+      ...rest,
+      additionalFindingStatus: (additionalFindings[0]?.status ??
+        null) as AssignedWorkOrderDetailRow['additionalFindingStatus'],
+    };
   }
 
   countAssignedToMechanic(mechanicId: string) {

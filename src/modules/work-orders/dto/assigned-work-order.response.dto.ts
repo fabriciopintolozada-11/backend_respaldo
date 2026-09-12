@@ -122,4 +122,15 @@ export class AssignedWorkOrderDetailResponseDto extends AssignedWorkOrderRespons
 
   @ApiProperty({ type: [ReservedPartLineDto], description: 'Reserved spare parts of the approved quote (HU-07, RN-16)' })
   reservedParts!: ReservedPartLineDto[];
+
+  // US-21 / FE-T21.3: decision state of the latest additional finding reported
+  // by the mechanic (PENDING_QUOTE while awaiting the reception decision).
+  // Informational only; carries no monetary fields (RN-16).
+  @ApiProperty({
+    enum: ['NONE', 'PENDING_QUOTE', 'APPROVED', 'REJECTED'],
+    description:
+      'US-21: decision state of the latest additional finding. ' +
+      'NONE when the order has no annex. Never includes monetary fields (RN-16).',
+  })
+  additionalFindingStatus!: 'NONE' | 'PENDING_QUOTE' | 'APPROVED' | 'REJECTED';
 }
