@@ -16,6 +16,7 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
   let customerId: string;
   let vehicleId: string;
   let ownWorkOrderId: string;
+  let ownWorkOrder2Id: string;
 
   const mechanicId = '00000000-0000-0000-0000-000000000021';
   const otherMechanicId = '00000000-0000-0000-0000-000000000022';
@@ -60,6 +61,48 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
       },
     });
     ownWorkOrderId = ownWorkOrder.id;
+
+    // FE-T21.3 (US-21): additional_findings.reported_by references users.id, so
+    // the mechanic identity must exist as a User row to seed a finding annex.
+    await prisma.user.upsert({
+      where: { id: mechanicId },
+      update: {},
+      create: {
+        id: mechanicId,
+        username: `mech-hu03-${Date.now()}`,
+        passwordHash: 'not-used',
+        fullName: 'Mecánico HU-03',
+        role: 'MECHANIC',
+        isActive: true,
+      },
+    });
+    await prisma.additionalFinding.create({
+      data: {
+        workOrderId: ownWorkOrderId,
+        description: 'Fuga de aceite detectada durante la reparación',
+        suggestedTasks: ['Reemplazar retén de bancada'],
+        suggestedPartIds: [],
+        estimatedHours: 3,
+        status: 'PENDING_QUOTE',
+        reportedBy: mechanicId,
+      },
+    });
+
+    // Second order of the same mechanic without any annex: the detail must
+    // report additionalFindingStatus = NONE.
+    const ownWorkOrder2 = await prisma.workOrder.create({
+      data: {
+        vehicleId,
+        customerId,
+        receptionistId,
+        initialComplaint: 'Falla sin ampliación de presupuesto',
+        status: 'EN_REPARACION',
+        mechanicId,
+        assignedAt: new Date(),
+      },
+    });
+    ownWorkOrder2Id = ownWorkOrder2.id;
+
     await prisma.workOrder.create({
       data: {
         vehicleId,
@@ -74,7 +117,9 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
   });
 
   afterAll(async () => {
+    await prisma.additionalFinding.deleteMany({ where: { workOrderId: { in: [ownWorkOrderId, ownWorkOrder2Id] } } });
     await prisma.workOrder.deleteMany({ where: { vehicleId } });
+    await prisma.user.deleteMany({ where: { id: mechanicId } });
     await prisma.vehicle.delete({ where: { id: vehicleId } });
     await prisma.customer.delete({ where: { id: customerId } });
     await prisma.mechanic.deleteMany({ where: { id: { in: [mechanicId, otherMechanicId] } } });
@@ -102,9 +147,11 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
     expect(response.body).toHaveProperty('total');
     expect(response.body).toHaveProperty('page');
     expect(response.body).toHaveProperty('pageSize');
-    expect(response.body.total).toBe(1);
-    expect(response.body.data).toHaveLength(1);
-    expect(response.body.data[0].id).toBe(ownWorkOrderId);
+    expect(response.body.total).toBe(2);
+    expect(response.body.data).toHaveLength(2);
+    expect(response.body.data.map((wo: { id: string }) => wo.id).sort()).toEqual(
+      [ownWorkOrderId, ownWorkOrder2Id].sort(),
+    );
     expect(JSON.stringify(response.body)).not.toMatch(/price|cost|amount|rate/i);
 
     const otherMechanicResponse = await request(app.getHttpServer())
@@ -113,6 +160,7 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
       .expect(200);
     expect(otherMechanicResponse.body.total).toBe(1);
     expect(otherMechanicResponse.body.data[0].id).not.toBe(ownWorkOrderId);
+    expect(otherMechanicResponse.body.data[0].id).not.toBe(ownWorkOrder2Id);
   });
 
   it('returns the technical detail of an assigned work order without any monetary value (RN-16)', async () => {
@@ -125,6 +173,28 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
     expect(response.body.vehicle.plate).toBe(plate);
     expect(response.body.vehicle.brand).toBe('Toyota');
     expect(response.body.vehicle.model).toBe('Corolla');
+    expect(JSON.stringify(response.body)).not.toMatch(/price|cost|amount|rate/i);
+  });
+
+  it('exposes the latest additional finding decision to the mechanic (FE-T21.3, US-21)', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/assigned/${ownWorkOrderId}`)
+      .set('Authorization', mechanicAuthorization)
+      .expect(200);
+
+    expect(response.body.id).toBe(ownWorkOrderId);
+    expect(response.body.additionalFindingStatus).toBe('PENDING_QUOTE');
+    expect(JSON.stringify(response.body)).not.toMatch(/price|cost|amount|rate/i);
+  });
+
+  it('reports NONE for an assigned order without additional finding (FE-T21.3, US-21)', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/work-orders/assigned/${ownWorkOrder2Id}`)
+      .set('Authorization', mechanicAuthorization)
+      .expect(200);
+
+    expect(response.body.id).toBe(ownWorkOrder2Id);
+    expect(response.body.additionalFindingStatus).toBe('NONE');
     expect(JSON.stringify(response.body)).not.toMatch(/price|cost|amount|rate/i);
   });
 

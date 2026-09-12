@@ -133,8 +133,25 @@ describe('AssignedOrdersService (US-03)', () => {
         },
       ],
     });
+    expect(detail.additionalFindingStatus).toBe('NONE');
     expect(JSON.stringify(detail)).not.toMatch(/price|cost|amount|rate/i);
   });
+
+  it.each(['PENDING_QUOTE', 'APPROVED', 'REJECTED'])(
+    'exposes the additional finding decision state (%s) to the mechanic without costs (FE-T21.3, US-21, RN-16)',
+    async (status) => {
+      repository.findAssignedDetail.mockResolvedValue({
+        ...assignedRow,
+        vehicle: { plate: '1234ABC', brand: 'Toyota', model: 'Corolla', year: 2020 },
+        additionalFindingStatus: status,
+      });
+
+      const detail = await service.getAssignedDetail('mechanic-1', 'wo-1');
+
+      expect(detail.additionalFindingStatus).toBe(status);
+      expect(JSON.stringify(detail)).not.toMatch(/price|cost|amount|rate/i);
+    },
+  );
 
   it('never exposes cost, price or subtotal of the quote parts (RN-16)', async () => {
     repository.findAssignedToMechanic.mockResolvedValue([{ ...assignedRow, quote: approvedQuote }]);

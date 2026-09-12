@@ -96,6 +96,10 @@ export class AssignedOrdersService {
         year: order.vehicle.year,
       },
       quote: this.toApprovedQuote(order.quote),
+      // US-21 / FE-T21.3: expose the decision state of the latest additional
+      // finding so the mechanic console can banner the pending authorization.
+      // Defaults to 'NONE' when the order has no annex. Non-financial (RN-16).
+      additionalFindingStatus: order.additionalFindingStatus ?? 'NONE',
       brand: order.vehicle.brand,
       model: order.vehicle.model,
       year: order.vehicle.year,
