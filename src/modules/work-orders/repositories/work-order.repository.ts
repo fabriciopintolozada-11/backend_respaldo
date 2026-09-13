@@ -644,7 +644,7 @@ export class WorkOrderRepository {
       await tx.technicalHistory.create({
         data: {
           vehicleId: order.vehicleId,
-          description: `Additional finding approved for work order ${workOrderId}: ${finding.description}. Order resumes repair (US-21).`,
+          description: `Additional finding approved for work order ${workOrderId}: ${finding.description}. Order resumes repair.`,
         },
       });
       if (order.mechanicId) {
