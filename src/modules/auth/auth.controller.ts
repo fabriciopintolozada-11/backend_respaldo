@@ -5,6 +5,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile.response.dto';
 
@@ -36,6 +37,17 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Refresh token inválido o expirado' })
   refresh(@Body() dto: RefreshDto): Promise<AuthResponseDto> {
     return this.service.refresh(dto);
+  }
+
+  @ApiBearerAuth()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cerrar sesión revocando el refresh token en el servidor (US-00, BE-E10)' })
+  @ApiResponse({ status: 204, description: 'Refresh token revocado en la denylist' })
+  @ApiResponse({ status: 400, description: 'El cuerpo de la petición es inválido' })
+  @ApiResponse({ status: 401, description: 'No autenticado o refresh token inválido' })
+  logout(@Body() dto: LogoutDto): Promise<void> {
+    return this.service.logout(dto);
   }
 
   @ApiBearerAuth()

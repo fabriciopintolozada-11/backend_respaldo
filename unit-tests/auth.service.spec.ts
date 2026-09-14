@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { UserRepository } from '../src/modules/auth/repositories/user.repository';
+import { RevokedRefreshTokenRepository } from '../src/modules/auth/repositories/revoked-refresh-token.repository';
 import { UserRole } from '../src/common/enums/user-role.enum';
 
 describe('AuthService (US-00)', () => {
@@ -17,6 +18,12 @@ describe('AuthService (US-00)', () => {
   const repository = {
     findByUsername: jest.fn(),
     findActiveById: jest.fn(),
+  };
+  const revocation = {
+    findByJti: jest.fn(),
+    create: jest.fn(),
+    deleteManyByUser: jest.fn(),
+    deleteExpired: jest.fn(),
   };
   const jwt = {
     signAsync: jest.fn(),
@@ -44,11 +51,13 @@ describe('AuthService (US-00)', () => {
     );
     config.get.mockImplementation((key: string) => (key === 'JWT_EXPIRES_IN' ? '15m' : '7d'));
     jwt.signAsync.mockResolvedValue('signed-token');
+    revocation.findByJti.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UserRepository, useValue: repository },
+        { provide: RevokedRefreshTokenRepository, useValue: revocation },
         { provide: JwtService, useValue: jwt },
         { provide: ConfigService, useValue: config },
       ],
@@ -85,7 +94,7 @@ describe('AuthService (US-00)', () => {
   });
 
   it('issues a new token pair from a valid refresh token (US-00)', async () => {
-    jwt.verifyAsync.mockResolvedValue({ sub: user.id });
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id, jti: 'jti-valid', exp: 1_000_000 });
     repository.findActiveById.mockResolvedValue(user);
 
     const result = await service.refresh({ refreshToken: 'valid-refresh' });
@@ -95,10 +104,68 @@ describe('AuthService (US-00)', () => {
     expect(result.accessToken).toBe('signed-token');
   });
 
+  it('rotates the used refresh token: revokes the old jti and mints a new pair (BE-E10)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id, jti: 'jti-used', exp: 1_000_000 });
+    repository.findActiveById.mockResolvedValue(user);
+
+    await service.refresh({ refreshToken: 'used-refresh' });
+
+    expect(revocation.create).toHaveBeenCalledWith({
+      jti: 'jti-used',
+      userId: user.id,
+      expiresAt: new Date(1_000_000 * 1000),
+    });
+    expect(revocation.deleteExpired).toHaveBeenCalledWith(expect.any(Date));
+  });
+
+  it('revokes the whole user family and returns 401 when the refresh token was reused (BE-E10)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id, jti: 'jti-stolen', exp: 1_000_000 });
+    repository.findActiveById.mockResolvedValue(user);
+    revocation.findByJti.mockResolvedValue({ jti: 'jti-stolen' });
+
+    await expect(service.refresh({ refreshToken: 'stolen-refresh' })).rejects.toThrow(UnauthorizedException);
+
+    expect(revocation.deleteManyByUser).toHaveBeenCalledWith(user.id);
+    expect(revocation.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when a refresh token has no jti (legacy token, BE-E10)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id });
+
+    await expect(service.refresh({ refreshToken: 'legacy-refresh' })).rejects.toThrow(UnauthorizedException);
+  });
+
   it('returns 401 for an invalid refresh token (US-00)', async () => {
     jwt.verifyAsync.mockRejectedValue(new Error('invalid'));
 
     await expect(service.refresh({ refreshToken: 'bad' })).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('logout revokes the refresh token in the denylist (BE-E10)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id, jti: 'jti-logout', exp: 1_000_000 });
+
+    await expect(service.logout({ refreshToken: 'to-revoke' })).resolves.toBeUndefined();
+
+    expect(revocation.create).toHaveBeenCalledWith({
+      jti: 'jti-logout',
+      userId: user.id,
+      expiresAt: new Date(1_000_000 * 1000),
+    });
+  });
+
+  it('logout is idempotent when the refresh token is already revoked (BE-E10)', async () => {
+    jwt.verifyAsync.mockResolvedValue({ sub: user.id, jti: 'jti-already' });
+    revocation.findByJti.mockResolvedValue({ jti: 'jti-already' });
+
+    await expect(service.logout({ refreshToken: 'again' })).resolves.toBeUndefined();
+
+    expect(revocation.create).not.toHaveBeenCalled();
+  });
+
+  it('logout returns 401 for an invalid refresh token (BE-E10)', async () => {
+    jwt.verifyAsync.mockRejectedValue(new Error('invalid'));
+
+    await expect(service.logout({ refreshToken: 'bad' })).rejects.toThrow(UnauthorizedException);
   });
 
   it('returns the profile of an active user without the hash (US-00)', async () => {

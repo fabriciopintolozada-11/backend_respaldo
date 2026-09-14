@@ -2,11 +2,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'crypto';
 import type { StringValue } from 'ms';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { UserRepository } from './repositories/user.repository';
+import { RevokedRefreshTokenRepository } from './repositories/revoked-refresh-token.repository';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile.response.dto';
 
@@ -22,10 +25,25 @@ export interface AuthUser {
   isActive: boolean;
 }
 
+interface RefreshTokenClaims {
+  sub: string;
+  jti?: string;
+  exp?: number;
+}
+
+// BE-E10: payload after verification always carries a jti (tokens minted
+// before revocation support are rejected), so callers can rely on it.
+type VerifiedRefreshToken = {
+  sub: string;
+  jti: string;
+  exp?: number;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly repository: UserRepository,
+    private readonly revocation: RevokedRefreshTokenRepository,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -52,18 +70,49 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto): Promise<AuthResponseDto> {
-    let payload: { sub: string };
+    const payload = await this.verifyRefreshToken(dto.refreshToken);
+
+    const user = await this.repository.findActiveById(payload.sub);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado o inactivo');
+
+    // BE-E10 / US-00: reuse of a revoked jti means the token family leaked.
+    // Revoke every refresh token of the user and reject before rotating.
+    if (await this.revocation.findByJti(payload.jti)) {
+      await this.revocation.deleteManyByUser(user.id);
+      throw new UnauthorizedException('Refresh token reutilizado o revocado');
+    }
+
+    // Rotation: the used token becomes unusable, a fresh pair is issued.
+    const expiresAt = payload.exp ? new Date(payload.exp * 1000) : new Date();
+    await this.revocation.create({ jti: payload.jti, userId: user.id, expiresAt });
+    await this.revocation.deleteExpired(new Date());
+    return this.buildAuthResponse(user);
+  }
+
+  async logout(dto: LogoutDto): Promise<void> {
+    const payload = await this.verifyRefreshToken(dto.refreshToken);
+
+    // Idempotent: revoking an already revoked token is a success (204).
+    if (!(await this.revocation.findByJti(payload.jti))) {
+      const expiresAt = payload.exp ? new Date(payload.exp * 1000) : new Date();
+      await this.revocation.create({ jti: payload.jti, userId: payload.sub, expiresAt });
+    }
+  }
+
+  private async verifyRefreshToken(refreshToken: string): Promise<VerifiedRefreshToken> {
+    let payload: RefreshTokenClaims;
     try {
-      payload = await this.jwt.verifyAsync<{ sub: string }>(dto.refreshToken, {
+      payload = await this.jwt.verifyAsync<RefreshTokenClaims>(refreshToken, {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
     } catch {
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
 
-    const user = await this.repository.findActiveById(payload.sub);
-    if (!user) throw new UnauthorizedException('Usuario no encontrado o inactivo');
-    return this.buildAuthResponse(user);
+    // Tokens minted before BE-E10 carried no jti and cannot participate in
+    // rotation/revocation; treat them as invalid.
+    if (!payload.jti) throw new UnauthorizedException('Refresh token inválido o expirado');
+    return payload as VerifiedRefreshToken;
   }
 
   async getProfile(userId: string): Promise<UserProfileResponseDto> {
@@ -89,7 +138,7 @@ export class AuthService {
       { secret: accessSecret, expiresIn: accessExpires, subject: user.id },
     );
     const refreshToken = await this.jwt.signAsync(
-      {},
+      { jti: randomUUID() },
       { secret: refreshSecret, expiresIn: refreshExpires, subject: user.id },
     );
 
