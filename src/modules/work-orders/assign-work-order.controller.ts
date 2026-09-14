@@ -1,7 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AssignWorkOrderDto, AssignWorkOrderResponseDto } from './dto/assign-work-order.dto';
@@ -9,7 +7,6 @@ import { AssignWorkOrderService } from './assign-work-order.service';
 
 @ApiTags('work-orders')
 @Controller('work-orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.WORKSHOP_LEAD)
 export class AssignWorkOrderController {
   constructor(private readonly service: AssignWorkOrderService) {}

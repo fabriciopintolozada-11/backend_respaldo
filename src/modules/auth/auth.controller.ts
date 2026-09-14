@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,7 +7,6 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile.response.dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 // US-00 / BE-T00.4: authentication endpoints. Login and refresh are public
 // (@Public exempts them from the global JwtAuthGuard); profile requires an
@@ -40,7 +39,6 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiOperation({ summary: 'Obtener el perfil del usuario autenticado (US-00, BE-19)' })
   @ApiResponse({ status: 200, description: 'Perfil del usuario autenticado', type: UserProfileResponseDto })

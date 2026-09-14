@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './modules/auth/auth.module';
 import { AssignedOrdersModule } from './modules/work-orders/assigned-orders.module';
@@ -38,6 +40,12 @@ import { PublicTrackingModule } from './modules/public-tracking/public-tracking.
     WorkBaysModule,
     PublicTrackingModule,
   ],
-  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
+  providers: [
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // BE-E08: global auth + RBAC. @Public() marks public endpoints (login,
+    // refresh, public-tracking, swagger).
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}

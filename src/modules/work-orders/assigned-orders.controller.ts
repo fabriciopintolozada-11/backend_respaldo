@@ -1,8 +1,6 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AssignedOrdersService } from './assigned-orders.service';
@@ -14,7 +12,6 @@ import { AssignedWorkOrderDetailResponseDto } from './dto/assigned-work-order.re
 // (RN-04, RN-16). The mechanic id comes from the authenticated user (BE-19).
 @ApiTags('work-orders')
 @Controller('work-orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.MECHANIC)
 export class AssignedOrdersController {
   constructor(private readonly service: AssignedOrdersService) {}

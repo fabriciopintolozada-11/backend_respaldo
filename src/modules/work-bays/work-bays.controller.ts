@@ -1,7 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { WorkBaysService } from './work-bays.service';
@@ -13,7 +11,6 @@ import { WorkBayMonitoringResponseDto } from './dto/work-bay-response.dto';
 // the workshop lead and admins (RN-14).
 @ApiTags('work-bays')
 @Controller('work-bays')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
 export class WorkBaysController {
   constructor(private readonly service: WorkBaysService) {}
