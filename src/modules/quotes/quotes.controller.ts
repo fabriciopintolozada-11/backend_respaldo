@@ -18,7 +18,10 @@ import { QuotesService } from './quotes.service';
 export class QuotesController {
   constructor(private readonly service: QuotesService) {}
 
-  @Get('work-orders/:id/budget-approval')
+  // BE-E11: the controller prefix is already 'work-orders', so the literal
+  // path is ':id/budget-approval' (previously 'work-orders/:id/budget-approval'
+  // produced the duplicated route /work-orders/work-orders/:id/budget-approval).
+  @Get(':id/budget-approval')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get quote and work order detail for customer approval (HU-09)' })
   @ApiResponse({ status: 200, type: QuoteApprovalDetailResponseDto })
