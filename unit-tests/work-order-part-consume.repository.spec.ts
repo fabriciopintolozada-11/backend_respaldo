@@ -50,7 +50,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     return { repository: new WorkOrderRepository(prisma as never), prisma };
   };
 
-  it('decrements physical and reserved stock, marks INSTALLED and records the kardex (RN-08)', async () => {
+  it('decrements physical and reserved stock, keeps availableStock untouched (BE-E02), marks INSTALLED and records the kardex (RN-08)', async () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
 
@@ -61,7 +61,6 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
       data: {
         physicalStock: { decrement: 1 },
         reservedStock: { decrement: 1 },
-        availableStock: { decrement: 1 },
         lastMovementAt: expect.any(Date),
       },
     });

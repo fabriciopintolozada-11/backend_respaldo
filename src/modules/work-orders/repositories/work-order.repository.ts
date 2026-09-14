@@ -806,7 +806,10 @@ export class WorkOrderRepository {
       }
       // RN-08 + RN-01: guarded atomic decrement of physical and reserved stock.
       // The update only matches when both stocks are sufficient, preventing a
-      // negative balance at the database level.
+      // negative balance at the database level. availableStock is NOT
+      // decremented here (BE-E02): the reservation already moved the units from
+      // available to reserved, so the invariant available = physical - reserved
+      // holds without touching it on consumption.
       const stockUpdate = await transaction.sparePart.updateMany({
         where: {
           id: part.sparePartId,
@@ -816,7 +819,6 @@ export class WorkOrderRepository {
         data: {
           physicalStock: { decrement: dto.quantity },
           reservedStock: { decrement: dto.quantity },
-          availableStock: { decrement: dto.quantity },
           lastMovementAt: new Date(),
         },
       });
