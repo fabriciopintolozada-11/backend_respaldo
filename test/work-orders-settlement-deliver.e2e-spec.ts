@@ -65,8 +65,11 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     const installed2 = await prisma.sparePart.create({
       data: { code: `E2E-DLV-OF-${now}`, name: 'Oil filter', unitPrice: new Prisma.Decimal('100.00') },
     });
+    // RN-07: the quotePart RESERVED lines must be backed by reservedStock (2
+    // units for readyOrder + 2 for reservedOnlyOrder), otherwise the
+    // release-on-deliver guard (releaseReservedParts) aborts delivery.
     const reserved3 = await prisma.sparePart.create({
-      data: { code: `E2E-DLV-SP-${now}`, name: 'Spark plugs', unitPrice: new Prisma.Decimal('80.00') },
+      data: { code: `E2E-DLV-SP-${now}`, name: 'Spark plugs', unitPrice: new Prisma.Decimal('80.00'), physicalStock: 4, reservedStock: 4, availableStock: 0 },
     });
     sparePartIds = [installed1.id, installed2.id, reserved3.id];
 
