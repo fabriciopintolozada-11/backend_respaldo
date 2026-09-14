@@ -7,7 +7,12 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: true });
+
+  // BE-E09: CORS allowlist from CORS_ORIGINS (comma-separated). Defaults to
+  // reflecting any origin for local development; set the variable to lock the
+  // accepted origins in production.
+  const corsOrigins = process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
+  app.enableCors({ origin: corsOrigins && corsOrigins.length > 0 ? corsOrigins : true });
 
   // BE-11: strict global validation pipe.
   app.useGlobalPipes(
