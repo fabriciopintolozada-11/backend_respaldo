@@ -20,9 +20,24 @@ model User {
   reportedDiscrepancies InventoryDiscrepancy[]
   reportedAdditionalFindings AdditionalFinding[] @relation("AdditionalFindingReporter")
   decidedAdditionalFindings  AdditionalFinding[] @relation("AdditionalFindingDecider")
+  revokedRefreshTokens RevokedRefreshToken[]
 
   @@index([username])
   @@map("users")
+}
+
+// BE-E10 / US-00: server-side revocation of refresh tokens (denylist with TTL).
+// A row exists as long as a token must be unusable; expired rows are cleaned
+// lazily on refresh. Reuse of a revoked jti revokes the whole user family.
+model RevokedRefreshToken {
+  jti       String   @id @map("jti")
+  userId    String   @db.Uuid @map("user_id")
+  expiresAt DateTime @db.Timestamptz(6) @map("expires_at")
+  revokedAt DateTime @default(now()) @db.Timestamptz(6) @map("revoked_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("revoked_refresh_tokens")
 }
 
 model Customer {

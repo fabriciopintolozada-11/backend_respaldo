@@ -38,6 +38,7 @@ describe('AuthController (e2e) — US-00', () => {
   });
 
   afterAll(async () => {
+    await prisma.revokedRefreshToken.deleteMany({ where: { userId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await app.close();
   });
@@ -82,6 +83,50 @@ describe('AuthController (e2e) — US-00', () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/refresh')
       .send({ refreshToken: 'not-a-valid-token' })
+      .expect(401);
+  });
+
+  it('POST /api/v1/auth/logout revokes the refresh token and then refresh returns 401 (BE-E10)', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ username, password })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+  });
+
+  it('POST /api/v1/auth/logout returns 401 without an access token (BE-E10)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .send({ refreshToken: 'any-token' })
+      .expect(401);
+  });
+
+  it('reusing a rotated refresh token returns 401 (reuse detection, BE-E10)', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ username, password })
+      .expect(200);
+
+    const rotated = await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(200);
+
+    expect(rotated.body.refreshToken).not.toBe(login.body.refreshToken);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
       .expect(401);
   });
 
