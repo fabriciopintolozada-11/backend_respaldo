@@ -606,7 +606,9 @@ export class WorkOrderRepository {
       }
 
       // Labor item for the unforeseen finding priced at the official rate.
-      const laborHours = new Prisma.Decimal(Number(finding.estimatedHours));
+      // BE-P05 / RN-21: finding.estimatedHours is already a Prisma.Decimal, so
+      // it is used directly without a Number round trip (exact hour arithmetic).
+      const laborHours = finding.estimatedHours;
       const laborDelta = laborHours.mul(laborHourlyRate);
       if (laborHours.greaterThan(0)) {
         await tx.quoteDetail.create({

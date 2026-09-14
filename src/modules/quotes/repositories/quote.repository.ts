@@ -37,22 +37,57 @@ export class QuoteRepository {
       // quantities, and always resolve the unit price from the official catalog
       // instead of trusting whatever the frontend sent.
       const dedupedItems = this.dedupePartItems(dto.items);
-      const details = dedupedItems.map((item) => {
+      // BE-P05 / RN-21: the whole budget is built with Prisma.Decimal. The
+      // detail rows keep a Decimal quantity (QuoteDetail.quantity is DECIMAL)
+      // and the part rows keep the validated integer (QuotePart.quantity is a
+      // SMALLINT), so no Decimal -> Number -> Decimal round trip is performed.
+      const details: Array<{
+        description: string;
+        itemType: QuoteItemType;
+        quantity: Prisma.Decimal;
+        unitPrice: Prisma.Decimal;
+        subtotal: Prisma.Decimal;
+        sparePartId?: string;
+      }> = [];
+      const partItems: Array<{
+        sparePartId: string;
+        quantity: number;
+        unitPrice: Prisma.Decimal;
+        subtotal: Prisma.Decimal;
+      }> = [];
+      for (const item of dedupedItems) {
         const quantity = new Prisma.Decimal(item.quantity);
         const catalogPart = item.sparePartId ? parts.find((part) => part.id === item.sparePartId) : undefined;
         if (item.itemType === QuoteItemType.PART && !catalogPart) throw new NotFoundException('Spare part not found');
         // PART -> official catalog price; LABOR -> configured base hourly rate.
         const unitPrice = catalogPart ? catalogPart.unitPrice : laborHourlyRate;
-        return { ...item, quantity, unitPrice, subtotal: quantity.mul(unitPrice) };
-      });
+        const subtotal = quantity.mul(unitPrice);
+        details.push({
+          description: item.description,
+          itemType: item.itemType,
+          quantity,
+          unitPrice,
+          subtotal,
+          ...(item.sparePartId ? { sparePartId: item.sparePartId } : {}),
+        });
+        if (item.itemType === QuoteItemType.PART && item.sparePartId) {
+          // BE-P05: line subtotal computed with Decimal.mul() over the guarded
+          // integer quantity; the quantity never crosses through a JS Number.
+          partItems.push({
+            sparePartId: item.sparePartId as string,
+            quantity: item.quantity,
+            unitPrice,
+            subtotal: unitPrice.mul(item.quantity),
+          });
+        }
+      }
       const total = details.reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
       const laborSubtotal = details.filter((item) => item.itemType === QuoteItemType.LABOR).reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
       const partsSubtotal = details.filter((item) => item.itemType === QuoteItemType.PART).reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
-      const partItems = details.filter((item) => item.itemType === QuoteItemType.PART && item.sparePartId);
       const quote = await tx.quote.upsert({
         where: { workOrderId },
-        update: { total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { deleteMany: {}, create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { deleteMany: {}, create: partItems.map((item) => ({ sparePartId: item.sparePartId as string, quantity: Number(item.quantity), unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
-        create: { workOrderId, total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { create: partItems.map((item) => ({ sparePartId: item.sparePartId as string, quantity: Number(item.quantity), unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
+        update: { total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { deleteMany: {}, create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { deleteMany: {}, create: partItems.map((item) => ({ sparePartId: item.sparePartId, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
+        create: { workOrderId, total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { create: partItems.map((item) => ({ sparePartId: item.sparePartId, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
         include: { details: true },
       });
       await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'PRESUPUESTO_ENVIADO' } });
