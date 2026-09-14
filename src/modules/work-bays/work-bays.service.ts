@@ -3,6 +3,8 @@ import { WorkBayRepository } from './repositories/work-bay.repository';
 import { AssignWorkBayDto, AssignWorkBayResponseDto } from './dto/assign-work-bay.dto';
 import { UpdateWorkBayStatusDto } from './dto/update-work-bay-status.dto';
 import { WorkBayMonitoringResponseDto } from './dto/work-bay-response.dto';
+import { WorkOrderStatus } from '../../common/enums/work-order-status.enum';
+import { BayStatus } from '../../common/enums/work-bay-status.enum';
 
 // US-18 (BE-06, BE-07): orchestrates physical bay business rules (RN-05,
 // RN-14). The service is HTTP-agnostic and only throws domain exceptions.
@@ -17,10 +19,10 @@ export class WorkBaysService {
     return rows.map((row) => {
       const workOrder = row.currentWorkOrder;
       const status = !row.isOccupied
-        ? 'LIBRE'
-        : workOrder && workOrder.status === 'EN_ESPERA_DE_REPUESTO'
-          ? 'ESPERA_REPUESTO'
-          : 'OCUPADA';
+        ? BayStatus.FREE
+        : workOrder && workOrder.status === WorkOrderStatus.WAITING_FOR_PART
+          ? BayStatus.WAITING_FOR_PART
+          : BayStatus.OCCUPIED;
 
       return {
         id: row.id,

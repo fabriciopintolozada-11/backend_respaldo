@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 export interface PublicTrackingRow {
   id: string;
@@ -13,16 +14,16 @@ export interface PublicTrackingRow {
 // RN-17: public tracking only exposes active operational orders. Terminal or
 // inactive states must behave like a non-match so lookup failures stay private.
 const ACTIVE_PUBLIC_TRACKING_STATUSES = [
-  'RECIBIDO',
-  'ASIGNADA',
-  'EN_DIAGNOSTICO',
-  'PRESUPUESTO_ENVIADO',
-  'APROBADO',
-  'EN_REPARACION',
-  'EN_ESPERA_DE_REPUESTO',
+  WorkOrderStatus.RECEIVED,
+  WorkOrderStatus.ASSIGNED,
+  WorkOrderStatus.IN_DIAGNOSIS,
+  WorkOrderStatus.QUOTE_SENT,
+  WorkOrderStatus.APPROVED,
+  WorkOrderStatus.IN_REPAIR,
+  WorkOrderStatus.WAITING_FOR_PART,
   'ESPERANDO_REPUESTO',
-  'FINALIZADO',
-  'LISTO_ENTREGA',
+  WorkOrderStatus.FINALIZED,
+  WorkOrderStatus.READY_FOR_DELIVERY,
 ];
 
 @Injectable()

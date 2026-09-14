@@ -31,19 +31,19 @@ describe('WorkOrdersService (HU-01)', () => {
   });
 
   describe('HU-01 Escenario 1: Registro exitoso de nuevo vehículo', () => {
-    it("creates a work order in 'RECIBIDO' state with normalized plate", async () => {
+    it("creates a work order in 'RECEIVED' state with normalized plate", async () => {
       repository.createVehicleEntry = jest.fn().mockResolvedValue({
         id: 'work-order-id',
         vehicleId: 'vehicle-id',
         customerId: 'customer-id',
-        status: 'RECIBIDO',
+        status: 'RECEIVED',
         initialComplaint: dto.initialComplaint,
         createdAt: new Date(),
       });
 
       const result = await service.registerVehicleEntry(dto, 'receptionist-id');
 
-      expect(result.status).toBe('RECIBIDO');
+      expect(result.status).toBe('RECEIVED');
       expect(repository.createVehicleEntry).toHaveBeenCalledWith(
         { ...dto, plate: 'ABC-123' },
         'receptionist-id',
@@ -57,7 +57,7 @@ describe('WorkOrdersService (HU-01)', () => {
         id: 'work-order-new',
         vehicleId: 'existing-vehicle-id',
         customerId: 'original-customer-id',
-        status: 'RECIBIDO',
+        status: 'RECEIVED',
         initialComplaint: dto.initialComplaint,
         createdAt: new Date(),
       });
@@ -67,7 +67,7 @@ describe('WorkOrdersService (HU-01)', () => {
         'receptionist-id',
       );
 
-      expect(result.status).toBe('RECIBIDO');
+      expect(result.status).toBe('RECEIVED');
       expect(repository.createVehicleEntry).toHaveBeenCalledWith(
         { ...dto, plate: 'ABC-123' },
         'receptionist-id',
@@ -100,23 +100,23 @@ describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
   });
 
   it('records a diagnosis for the assigned mechanic and moves the order to diagnosis', async () => {
-    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'ASIGNADA' });
+    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'ASSIGNED' });
     const diagnostic: CreateDiagnosticDto = { description: 'Brake wear', suggestedTasks: ['Replace pads'], suggestedPartIds: [], estimatedHours: 2 };
     repository.createDiagnostic = jest.fn().mockResolvedValue({ description: diagnostic.description });
 
     await service.createDiagnostic('work-order-id', 'mechanic-id', diagnostic);
 
-    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'EN_DIAGNOSTICO', 'mechanic-id');
+    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'IN_DIAGNOSIS', 'mechanic-id');
   });
 
   it('suspends a repair when a diagnosis adds findings (RN-03)', async () => {
-    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'EN_REPARACION' });
+    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'IN_REPAIR' });
     const diagnostic: CreateDiagnosticDto = { description: 'Additional failure', suggestedTasks: [], suggestedPartIds: [], estimatedHours: 1 };
     repository.createDiagnostic = jest.fn().mockResolvedValue({});
 
     await service.createDiagnostic('work-order-id', 'mechanic-id', diagnostic);
 
-    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
+    expect(repository.createDiagnostic).toHaveBeenCalledWith('work-order-id', diagnostic, 'QUOTE_SENT', 'mechanic-id');
   });
 
   it('rejects diagnosis when the mechanic is not assigned to the work order (RN-04)', async () => {
@@ -134,7 +134,7 @@ describe('WorkOrdersService (HU-01) - Diagnostic tests', () => {
   });
 
   it('returns only non-financial diagnostic fields (RN-16)', async () => {
-    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'ASIGNADA' });
+    repository.findAssignedWorkOrder = jest.fn().mockResolvedValue({ status: 'ASSIGNED' });
     const diagnostic: CreateDiagnosticDto = {
       description: 'Brake wear',
       suggestedTasks: ['Replace pads'],
@@ -219,8 +219,8 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
   });
 
   describe('initial diagnosis (HU-11 - Escenario 1)', () => {
-    it.each(['RECIBIDO', 'ASIGNADA', 'EN_DIAGNOSTICO'])(
-      'moves a work order in state %s to EN_DIAGNOSTICO and persists the diagnostic',
+    it.each(['RECEIVED', 'ASSIGNED', 'IN_DIAGNOSIS'])(
+      'moves a work order in state %s to IN_DIAGNOSIS and persists the diagnostic',
       async (status) => {
         repository.findAssignedWorkOrder.mockResolvedValue({ status });
         repository.createDiagnostic.mockResolvedValue(storedDiagnostic);
@@ -230,7 +230,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
         expect(repository.createDiagnostic).toHaveBeenCalledWith(
           workOrderId,
           diagnostic,
-          'EN_DIAGNOSTICO',
+          'IN_DIAGNOSIS',
           mechanicId,
         );
         expect(result.workOrderId).toBe(workOrderId);
@@ -240,7 +240,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
     );
 
     it('registers the failures, hours and suggested parts from the DTO (RN-19 history is appended by the repository)', async () => {
-      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'ASIGNADA' });
+      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'ASSIGNED' });
       repository.createDiagnostic.mockResolvedValue(storedDiagnostic);
 
       await service.createDiagnostic(workOrderId, mechanicId, diagnostic);
@@ -253,15 +253,15 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
           suggestedPartIds: diagnostic.suggestedPartIds,
           estimatedHours: diagnostic.estimatedHours,
         }),
-        'EN_DIAGNOSTICO',
+        'IN_DIAGNOSIS',
         mechanicId,
       );
     });
   });
 
   describe('additional findings during repair (HU-11 - Escenario 2 / RN-03)', () => {
-    it('suspends the work order and returns it to PRESUPUESTO_ENVIADO when a new failure is found in EN_REPARACION', async () => {
-      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'EN_REPARACION' });
+    it('suspends the work order and returns it to QUOTE_SENT when a new failure is found in IN_REPAIR', async () => {
+      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'IN_REPAIR' });
       repository.createDiagnostic.mockResolvedValue(storedDiagnostic);
 
       await service.createDiagnostic(workOrderId, mechanicId, diagnostic);
@@ -269,20 +269,20 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
       expect(repository.createDiagnostic).toHaveBeenCalledWith(
         workOrderId,
         diagnostic,
-        'PRESUPUESTO_ENVIADO',
+        'QUOTE_SENT',
         mechanicId,
       );
     });
 
     it('sends the PRESPUESTO_ENVIADO transition so the repository suspends repair (RN-03)', async () => {
-      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'EN_REPARACION' });
+      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'IN_REPAIR' });
       repository.createDiagnostic.mockResolvedValue(storedDiagnostic);
 
       await service.createDiagnostic(workOrderId, mechanicId, diagnostic);
 
       const [orderIdArg, , targetStatus] = repository.createDiagnostic.mock.calls[0];
       expect(orderIdArg).toBe(workOrderId);
-      expect(targetStatus).toBe('PRESUPUESTO_ENVIADO');
+      expect(targetStatus).toBe('QUOTE_SENT');
 
       expect(repository.findAssignedWorkOrder).toHaveBeenCalledWith(workOrderId, mechanicId);
     });
@@ -310,7 +310,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
 
   describe('invalid state transitions', () => {
     it('throws a ConflictException when the work order cannot receive a diagnostic in its current state', async () => {
-      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'FINALIZADO' });
+      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'FINALIZED' });
 
       await expect(
         service.createDiagnostic(workOrderId, mechanicId, diagnostic),
@@ -322,7 +322,7 @@ describe('WorkOrdersService (HU-11 - Registrar diagnóstico)', () => {
 
   describe('financial data confidentiality (RN-16)', () => {
     it('returns only the diagnostic allowlist without any price or cost fields', async () => {
-      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'ASIGNADA' });
+      repository.findAssignedWorkOrder.mockResolvedValue({ status: 'ASSIGNED' });
       repository.createDiagnostic.mockResolvedValue(storedDiagnostic);
 
       const result = await service.createDiagnostic(workOrderId, mechanicId, diagnostic);

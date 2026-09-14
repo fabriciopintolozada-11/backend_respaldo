@@ -3,7 +3,7 @@ import { WorkOrderRepository } from '../src/modules/work-orders/repositories/wor
 import { CompleteWorkOrderDto } from '../src/modules/work-orders/dto/complete-work-order.dto';
 
 // US-19 / BE-16 / RN-05 / RN-14 / RN-19: the repository concludes the repair
-// as one atomic Prisma transaction. These tests assert the LISTO_ENTREGA
+// as one atomic Prisma transaction. These tests assert the READY_FOR_DELIVERY
 // transition, the bay release, the immutable history entry and the reception
 // notification.
 describe('WorkOrderRepository.completeWorkOrder (US-19)', () => {
@@ -40,7 +40,7 @@ describe('WorkOrderRepository.completeWorkOrder (US-19)', () => {
     return { repository: new WorkOrderRepository(prisma as never), prisma };
   };
 
-  it('sets LISTO_ENTREGA, frees the bay, records history and notifies reception (RN-05, RN-14, RN-19)', async () => {
+  it('sets READY_FOR_DELIVERY, frees the bay, records history and notifies reception (RN-05, RN-14, RN-19)', async () => {
     const tx = makeTx({
       workBay: {
         findFirst: jest.fn().mockResolvedValue({ id: 'bay-2', bayNumber: 2 }),
@@ -53,7 +53,7 @@ describe('WorkOrderRepository.completeWorkOrder (US-19)', () => {
 
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'wo-1' },
-      data: { status: 'LISTO_ENTREGA' },
+      data: { status: 'READY_FOR_DELIVERY' },
     });
     expect(tx.workBay.findFirst).toHaveBeenCalledWith({
       where: { currentWorkOrderId: 'wo-1' },
@@ -77,7 +77,7 @@ describe('WorkOrderRepository.completeWorkOrder (US-19)', () => {
         message: expect.stringContaining('wo-1'),
       },
     });
-    expect(result).toMatchObject({ id: 'wo-1', status: 'LISTO_ENTREGA', bayNumber: 2 });
+    expect(result).toMatchObject({ id: 'wo-1', status: 'READY_FOR_DELIVERY', bayNumber: 2 });
     expect(typeof result.completedAt).toBe('object');
   });
 
@@ -88,7 +88,7 @@ describe('WorkOrderRepository.completeWorkOrder (US-19)', () => {
     const result = await repository.completeWorkOrder('wo-1', {}, 'mech-1');
 
     expect(tx.workBay.update).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ bayNumber: null, status: 'LISTO_ENTREGA' });
+    expect(result).toMatchObject({ bayNumber: null, status: 'READY_FOR_DELIVERY' });
     expect(result.finalMileage).toBeNull();
     expect(result.closingNotes).toBeNull();
   });

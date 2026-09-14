@@ -7,7 +7,7 @@ import { ReturnSparePartDto } from '../src/modules/work-orders/dto/return-spare-
 // These tests assert the stock restore, the RELEASED/INSTALLED status logic,
 // the groupBy guard (net consumed units) and the immutable audit trail.
 describe('WorkOrderRepository.returnPart (HU-07 / BE-E03)', () => {
-  const orderWithPart = (status = 'EN_REPARACION', partStatus = 'INSTALLED', quantity = 2) => ({
+  const orderWithPart = (status = 'IN_REPAIR', partStatus = 'INSTALLED', quantity = 2) => ({
     id: 'wo-1',
     status,
     vehicleId: 'veh-1',
@@ -154,7 +154,7 @@ describe('WorkOrderRepository.returnPart (HU-07 / BE-E03)', () => {
   it('rejects when the spare part belongs to no order part (404 semantics)', async () => {
     const tx = makeTx({
       workOrder: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'wo-1', status: 'EN_REPARACION', vehicleId: 'veh-1', quote: { parts: [] } }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'wo-1', status: 'IN_REPAIR', vehicleId: 'veh-1', quote: { parts: [] } }),
       },
     });
     const { repository } = makeRepository(tx);

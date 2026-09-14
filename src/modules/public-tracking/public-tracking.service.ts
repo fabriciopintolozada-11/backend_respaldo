@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PublicTrackingRequestDto } from './dto/public-tracking-request.dto';
 import { PublicTrackingResponseDto } from './dto/public-tracking-response.dto';
 import { PublicTrackingRepository } from './repositories/public-tracking.repository';
+import { WorkOrderStatus } from '../../common/enums/work-order-status.enum';
 
 export const PUBLIC_TRACKING_NOT_FOUND_MESSAGE =
   'No se encontró ninguna orden de trabajo activa asociada a los datos ingresados';
@@ -37,6 +38,6 @@ export class PublicTrackingService {
   }
 
   private isReadyForPickup(status: string): boolean {
-    return status === 'LISTO_ENTREGA' || status === 'FINALIZADO';
+    return status === WorkOrderStatus.READY_FOR_DELIVERY || status === WorkOrderStatus.FINALIZED;
   }
 }

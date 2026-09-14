@@ -18,7 +18,7 @@ describe('PublicTrackingRepository (US-17 / BE-T17.3)', () => {
         vehicle: { plate: '1234ABC' },
         customer: { identification: '1234567' },
         status: {
-          in: expect.arrayContaining(['RECIBIDO', 'EN_REPARACION', 'LISTO_ENTREGA']),
+          in: expect.arrayContaining(['RECEIVED', 'IN_REPAIR', 'READY_FOR_DELIVERY']),
         },
       },
       orderBy: { createdAt: 'desc' },

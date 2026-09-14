@@ -19,7 +19,7 @@ describe('PublicTrackingService (US-17 / RN-17)', () => {
   it('normalizes the license plate and returns sanitized public tracking data', async () => {
     repository.findActiveByPlateAndNationalId.mockResolvedValue({
       id: 'work-order-id',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       createdAt: new Date('2026-09-10T12:00:00Z'),
       vehicle: { model: 'Hilux' },
       quote: {
@@ -39,7 +39,7 @@ describe('PublicTrackingService (US-17 / RN-17)', () => {
     expect(response).toEqual({
       workOrderNumber: 'work-order-id',
       vehicleModel: 'Hilux',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       receivedAt: new Date('2026-09-10T12:00:00Z'),
       readyForPickup: false,
       tasksSummary: ['Cambio de aceite', 'Alineación'],
@@ -48,7 +48,7 @@ describe('PublicTrackingService (US-17 / RN-17)', () => {
     expect(response).not.toHaveProperty('mechanicName');
   });
 
-  it.each(['LISTO_ENTREGA', 'FINALIZADO'])('marks %s as ready for pickup', async (status) => {
+  it.each(['READY_FOR_DELIVERY', 'FINALIZED'])('marks %s as ready for pickup', async (status) => {
     repository.findActiveByPlateAndNationalId.mockResolvedValue({
       id: 'work-order-id',
       status,
@@ -65,7 +65,7 @@ describe('PublicTrackingService (US-17 / RN-17)', () => {
   it('returns an empty task summary when the active order has no quote yet', async () => {
     repository.findActiveByPlateAndNationalId.mockResolvedValue({
       id: 'work-order-id',
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
       createdAt: new Date('2026-09-10T12:00:00Z'),
       vehicle: { model: 'Swift' },
       quote: null,

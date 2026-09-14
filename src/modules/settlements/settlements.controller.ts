@@ -29,7 +29,7 @@ export class SettlementsController {
   @ApiResponse({ status: 200, type: WorkOrderSettlementResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
   @ApiResponse({ status: 404, description: 'Work order not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA status (RN-05)' })
+  @ApiResponse({ status: 409, description: 'Work order is not in READY_FOR_DELIVERY status (RN-05)' })
   getSettlement(@Param('id', ParseUUIDPipe) id: string): Promise<WorkOrderSettlementResponseDto> {
     return this.service.getSettlement(id);
   }
@@ -45,7 +45,7 @@ export class SettlementsController {
   @ApiResponse({ status: 400, description: 'Validation error in the request body' })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
   @ApiResponse({ status: 404, description: 'Work order not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA or already delivered' })
+  @ApiResponse({ status: 409, description: 'Work order is not in READY_FOR_DELIVERY or already delivered' })
   deliver(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: DeliverWorkOrderDto,
@@ -64,7 +64,7 @@ export class SettlementsController {
   @ApiResponse({ status: 200, type: SettlementAdjustmentResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation (RN-15)' })
   @ApiResponse({ status: 404, description: 'Work order not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA or already delivered' })
+  @ApiResponse({ status: 409, description: 'Work order is not in READY_FOR_DELIVERY or already delivered' })
   @ApiResponse({ status: 422, description: 'Discount amount exceeds the available total (RN-15)' })
   applyDiscount(
     @Param('id', ParseUUIDPipe) id: string,
@@ -83,7 +83,7 @@ export class SettlementsController {
   @ApiResponse({ status: 200, type: SettlementAdjustmentResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation (RN-15)' })
   @ApiResponse({ status: 404, description: 'Work order or adjustment not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in LISTO_ENTREGA, already delivered, or adjustment already voided' })
+  @ApiResponse({ status: 409, description: 'Work order is not in READY_FOR_DELIVERY, already delivered, or adjustment already voided' })
   voidAdjustment(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: VoidAdjustmentDto,

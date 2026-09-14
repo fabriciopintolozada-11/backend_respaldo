@@ -9,7 +9,7 @@ describe('QueryTrackingWorkOrdersDto (US-05 / BE-T05.1)', () => {
     plainToInstance(QueryTrackingWorkOrdersDto, data) as QueryTrackingWorkOrdersDto;
 
   it('accepts a payload with all filters populated', async () => {
-    const dto = createDto({ licensePlate: '4589-KXA', status: 'EN_REPARACION', workBayId: VALID_UUID });
+    const dto = createDto({ licensePlate: '4589-KXA', status: 'IN_REPAIR', workBayId: VALID_UUID });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
@@ -35,7 +35,7 @@ describe('QueryTrackingWorkOrdersDto (US-05 / BE-T05.1)', () => {
   });
 
   it('accepts every status used by the workshop', async () => {
-    for (const status of ['RECIBIDO', 'ASIGNADA', 'EN_DIAGNOSTICO', 'PRESUPUESTO_ENVIADO', 'APROBADO', 'EN_REPARACION', 'EN_ESPERA_DE_REPUESTO', 'LISTO_ENTREGA', 'ENTREGADO', 'FINALIZADO']) {
+    for (const status of ['RECEIVED', 'ASSIGNED', 'IN_DIAGNOSIS', 'QUOTE_SENT', 'APPROVED', 'IN_REPAIR', 'WAITING_FOR_PART', 'READY_FOR_DELIVERY', 'DELIVERED', 'FINALIZED']) {
       const dto = createDto({ status });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);

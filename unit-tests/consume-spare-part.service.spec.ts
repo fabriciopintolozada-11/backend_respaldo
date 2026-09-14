@@ -15,7 +15,7 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
 
   const baseContext = {
     id: 'wo-1',
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     mechanicId: 'mech-1',
     vehicleId: 'veh-1',
     quote: {
@@ -33,7 +33,7 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
   });
 
   describe('successful confirmation', () => {
-    it('delegates with the reserved part and a valid status (EN_REPARACION)', async () => {
+    it('delegates with the reserved part and a valid status (IN_REPAIR)', async () => {
       repository.findConsumeContext = jest.fn().mockResolvedValue(baseContext);
       repository.consumePart = jest.fn().mockResolvedValue({
         id: 'qp-1',
@@ -45,7 +45,7 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
 
       const result = await service.consumePart('wo-1', 'mech-1', UserRole.MECHANIC, dto);
 
-      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'EN_REPARACION');
+      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'IN_REPAIR');
       expect(result).toEqual({
         id: 'qp-1',
         code: 'FIL-01',
@@ -55,13 +55,13 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
       });
     });
 
-    it('transitions an APROBADO order to EN_REPARACION on first consumption (HU-07)', async () => {
-      repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status: 'APROBADO' });
+    it('transitions an APPROVED order to IN_REPAIR on first consumption (HU-07)', async () => {
+      repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status: 'APPROVED' });
       repository.consumePart = jest.fn().mockResolvedValue({ id: 'qp-1', code: 'FIL-01', name: 'Filtro', quantity: 1, status: 'INSTALLED' });
 
       await service.consumePart('wo-1', 'mech-1', UserRole.MECHANIC, dto);
 
-      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'EN_REPARACION');
+      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'IN_REPAIR');
     });
 
     it('allows the workshop lead to consume a part in any order (RN-14 oversight)', async () => {
@@ -73,13 +73,13 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
       expect(repository.consumePart).toHaveBeenCalled();
     });
 
-    it('keeps nextStatus as EN_REPARACION when the order is already in repair', async () => {
+    it('keeps nextStatus as IN_REPAIR when the order is already in repair', async () => {
       repository.findConsumeContext = jest.fn().mockResolvedValue(baseContext);
       repository.consumePart = jest.fn().mockResolvedValue({ id: 'qp-1', code: 'FIL-01', name: 'Filtro', quantity: 1, status: 'INSTALLED' });
 
       await service.consumePart('wo-1', 'mech-1', UserRole.MECHANIC, dto);
 
-      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'EN_REPARACION');
+      expect(repository.consumePart).toHaveBeenCalledWith('wo-1', dto, 'mech-1', 'IN_REPAIR');
     });
   });
 
@@ -94,7 +94,7 @@ describe('WorkOrdersService.consumePart (HU-07 - Confirmar uso de repuestos)', (
   });
 
   describe('RN-09: work order state machine', () => {
-    it.each(['RECIBIDO', 'EN_DIAGNOSTICO', 'PRESUPUESTO_ENVIADO', 'ESPERANDO_REPUESTO', 'FINALIZADO'])(
+    it.each(['RECEIVED', 'IN_DIAGNOSIS', 'QUOTE_SENT', 'ESPERANDO_REPUESTO', 'FINALIZED'])(
       'rejects consumption when the order is in state %s (RN-09)',
       async (status) => {
         repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status });

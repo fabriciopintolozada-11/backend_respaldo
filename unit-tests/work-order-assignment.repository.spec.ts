@@ -30,7 +30,7 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
     const row = {
       id: 'work-order-1',
       vehicleId: 'vehicle-1',
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
       initialComplaint: 'Engine noise',
       createdAt: new Date(),
       mechanicId: null,
@@ -54,12 +54,12 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
       customerName: 'Customer One',
       customerIdentification: 'ID-1',
       initialComplaint: 'Engine noise',
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
       createdAt: row.createdAt,
       mechanicId: null,
     }]);
     expect(prisma.workOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: 'RECIBIDO', mechanicId: null },
+      where: { status: 'RECEIVED', mechanicId: null },
       skip: 10,
       take: 10,
     }));
@@ -94,9 +94,9 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
   it('assigns a received order to an active mechanic atomically', async () => {
     const transaction = {
       workOrder: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'work-order-1', status: 'RECIBIDO', mechanicId: null }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'work-order-1', status: 'RECEIVED', mechanicId: null }),
         update: jest.fn().mockResolvedValue({
-          id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASIGNADA', updatedAt: new Date(),
+          id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASSIGNED', updatedAt: new Date(),
         }),
       },
       mechanic: { findUnique: jest.fn().mockResolvedValue({ id: 'mechanic-1', isActive: true }) },
@@ -104,11 +104,11 @@ describe('WorkOrderRepository HU-04 queries and assignment', () => {
     prisma.$transaction.mockImplementation((callback: (value: typeof transaction) => unknown) => callback(transaction));
 
     await expect(repository.assign('work-order-1', 'mechanic-1')).resolves.toMatchObject({
-      id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASIGNADA',
+      id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASSIGNED',
     });
     expect(transaction.workOrder.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'work-order-1' },
-      data: { mechanicId: 'mechanic-1', assignedAt: expect.any(Date), status: 'ASIGNADA' },
+      data: { mechanicId: 'mechanic-1', assignedAt: expect.any(Date), status: 'ASSIGNED' },
     }));
   });
 

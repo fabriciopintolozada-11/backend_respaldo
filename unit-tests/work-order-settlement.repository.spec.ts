@@ -6,7 +6,7 @@ import { ApplyDiscountDto } from '../src/modules/settlements/dto/apply-discount.
 import { VoidAdjustmentDto } from '../src/modules/settlements/dto/void-adjustment.dto';
 
 // US-20 / BE-16 / RN-21 / RN-19: the repository settles and delivers a
-// vehicle as one atomic Prisma transaction. These tests assert the ENTREGADO
+// vehicle as one atomic Prisma transaction. These tests assert the DELIVERED
 // transition, the charged total and the immutable history entry.
 describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
   const WORK_ORDER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
@@ -25,7 +25,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
         findUnique: jest.fn().mockResolvedValue({
           id: WORK_ORDER_ID,
           vehicleId: VEHICLE_ID,
-          status: 'LISTO_ENTREGA',
+          status: 'READY_FOR_DELIVERY',
           deliveredAt: null,
           quote: {
             laborSubtotal: new Prisma.Decimal('650.00'),
@@ -66,7 +66,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
     return { repository: new SettlementRepository(prisma as never), prisma };
   };
 
-  it('sets ENTREGADO, persists payment data and records history (RN-21, RN-19)', async () => {
+  it('sets DELIVERED, persists payment data and records history (RN-21, RN-19)', async () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
 
@@ -75,7 +75,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: WORK_ORDER_ID },
       data: {
-        status: 'ENTREGADO',
+        status: 'DELIVERED',
         deliveredAt: expect.any(Date),
         paymentMethod: 'QR_TRANSFER',
         receiptNumber: 'F2026-00155',
@@ -99,7 +99,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
     });
     expect(result).toMatchObject({
       id: WORK_ORDER_ID,
-      status: 'ENTREGADO',
+      status: 'DELIVERED',
       paymentMethod: 'QR_TRANSFER',
       receiptNumber: 'F2026-00155',
       totalCharged: '950.00',
@@ -114,7 +114,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
         findUnique: jest.fn().mockResolvedValue({
           id: WORK_ORDER_ID,
           vehicleId: VEHICLE_ID,
-          status: 'LISTO_ENTREGA',
+          status: 'READY_FOR_DELIVERY',
           deliveredAt: null,
           quote: null,
           settlementAdjustments: [],
@@ -153,13 +153,13 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
     expect(tx.technicalHistory.create).not.toHaveBeenCalled();
   });
 
-  it('rejects an order not in LISTO_ENTREGA with 409 (RN-05)', async () => {
+  it('rejects an order not in READY_FOR_DELIVERY with 409 (RN-05)', async () => {
     const tx = makeTx({
       workOrder: {
         findUnique: jest.fn().mockResolvedValue({
           id: WORK_ORDER_ID,
           vehicleId: VEHICLE_ID,
-          status: 'EN_REPARACION',
+          status: 'IN_REPAIR',
           deliveredAt: null,
           quote: null,
           settlementAdjustments: [],
@@ -181,7 +181,7 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
         findUnique: jest.fn().mockResolvedValue({
           id: WORK_ORDER_ID,
           vehicleId: VEHICLE_ID,
-          status: 'ENTREGADO',
+          status: 'DELIVERED',
           deliveredAt: new Date('2026-09-10T15:00:00.000Z'),
           quote: null,
           settlementAdjustments: [],
@@ -231,11 +231,11 @@ describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
       expect(tx.settlementAdjustment.create).not.toHaveBeenCalled();
     });
 
-    it('rejects a non LISTO_ENTREGA order with 409', async () => {
+    it('rejects a non READY_FOR_DELIVERY order with 409', async () => {
       const tx = makeTx({
         workOrder: {
           findUnique: jest.fn().mockResolvedValue({
-            id: WORK_ORDER_ID, vehicleId: VEHICLE_ID, status: 'EN_REPARACION',
+            id: WORK_ORDER_ID, vehicleId: VEHICLE_ID, status: 'IN_REPAIR',
             deliveredAt: null, quote: null, settlementAdjustments: [],
           }),
           update: jest.fn(),

@@ -1,13 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 // US-13: response returned after successfully setting a work order to
-// EN_ESPERA_DE_REPUESTO. Contains the confirmation fields the frontend
+// WAITING_FOR_PART. Contains the confirmation fields the frontend
 // needs to reflect the state change.
 export class AwaitingPartResponseDto {
   @ApiProperty({ description: 'Work order id' })
   id!: string;
 
-  @ApiProperty({ description: 'New work order status', example: 'EN_ESPERA_DE_REPUESTO' })
+  @ApiProperty({ description: 'New work order status', example: WorkOrderStatus.WAITING_FOR_PART })
   status!: string;
 
   @ApiProperty({ description: 'UUID of the reported missing spare part' })

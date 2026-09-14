@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AdjustmentType } from './settlement-adjustment.response.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 // US-20: a single installed spare part line of the settlement. Monetary
 // fields are serialized as strings to avoid float precision loss (BE-13).
@@ -48,7 +49,7 @@ export class WorkOrderSettlementResponseDto {
   @ApiProperty({ description: 'Work order id' })
   workOrderId!: string;
 
-  @ApiProperty({ description: 'Work order status', example: 'LISTO_ENTREGA' })
+  @ApiProperty({ description: 'Work order status', example: WorkOrderStatus.READY_FOR_DELIVERY })
   status!: string;
 
   @ApiProperty({ description: 'Vehicle license plate' })

@@ -6,13 +6,14 @@ import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
 import { ApproveAdditionalFindingDto } from '../dto/approve-additional-finding.dto';
 import { RejectAdditionalFindingDto } from '../dto/reject-additional-finding.dto';
 import { AdditionalFindingResponseDto } from '../dto/additional-finding.response.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class AdditionalFindingRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // HU-11: persist a technical diagnostic. When the order is already under
-  // repair (status PRESUPUESTO_ENVIADO, RN-03), the reported finding is also
+  // repair (status QUOTE_SENT, RN-03), the reported finding is also
   // captured as an AdditionalFinding annex so reception can approve or reject
   // the supplementary budget (US-21). reportedBy is the authenticated mechanic
   // passed by the service (BE-19).
@@ -27,7 +28,7 @@ export class AdditionalFindingRepository {
       await transaction.technicalHistory.create({ data: { vehicleId: order.vehicleId, description: `Diagnostic recorded for work order ${id}: ${dto.description}` } });
       // US-21 / RN-03: an unforeseen finding reported during repair becomes a
       // pending additional-quote annex for the reception to decide.
-      if (status === 'PRESUPUESTO_ENVIADO' && reportedBy) {
+      if (status === WorkOrderStatus.QUOTE_SENT && reportedBy) {
         await transaction.additionalFinding.create({
           data: {
             workOrderId: id,
@@ -113,7 +114,7 @@ export class AdditionalFindingRepository {
   // are priced from the catalog, reserved against available stock (RN-07), the
   // active quote is extended (NEW QuotePart/QuoteDetail rows + totals, the
   // original lines are never modified), the annex is marked APPROVED with the
-  // contact channel, the order resumes EN_REPARACION and the immutable
+  // contact channel, the order resumes IN_REPAIR and the immutable
   // technical history and mechanic notification are recorded (BE-16 / BE-17).
   approveAdditionalFinding(
     workOrderId: string,
@@ -151,7 +152,7 @@ export class AdditionalFindingRepository {
         },
       });
       if (!order) throw new NotFoundException('Work order not found');
-      if (order.status !== 'PRESUPUESTO_ENVIADO') {
+      if (order.status !== WorkOrderStatus.QUOTE_SENT) {
         throw new ConflictException('Work order is not awaiting an additional budget approval');
       }
       const finding = order.additionalFindings[0];
@@ -254,7 +255,7 @@ export class AdditionalFindingRepository {
         },
       });
 
-      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'EN_REPARACION' } });
+      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: WorkOrderStatus.IN_REPAIR } });
       await tx.technicalHistory.create({
         data: {
           vehicleId: order.vehicleId,
@@ -277,7 +278,7 @@ export class AdditionalFindingRepository {
 
   // US-21 (BE-T21.2, RN-19): reject the additional quote. The annex is archived
   // with the permanent label "Daño no reparado por decisión del cliente", the
-  // order resumes EN_REPARACION and the mechanic is notified that only the
+  // order resumes IN_REPAIR and the mechanic is notified that only the
   // originally approved work continues. No stock was reserved for a pending
   // annex, so nothing is released.
   rejectAdditionalFinding(
@@ -301,7 +302,7 @@ export class AdditionalFindingRepository {
         },
       });
       if (!order) throw new NotFoundException('Work order not found');
-      if (order.status !== 'PRESUPUESTO_ENVIADO') {
+      if (order.status !== WorkOrderStatus.QUOTE_SENT) {
         throw new ConflictException('Work order is not awaiting an additional budget approval');
       }
       const finding = order.additionalFindings[0];
@@ -312,7 +313,7 @@ export class AdditionalFindingRepository {
         data: { status: 'REJECTED', decidedBy: userId, decidedAt: new Date(), rejectionReason: dto.reason },
       });
 
-      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'EN_REPARACION' } });
+      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: WorkOrderStatus.IN_REPAIR } });
       await tx.technicalHistory.create({
         data: {
           vehicleId: order.vehicleId,

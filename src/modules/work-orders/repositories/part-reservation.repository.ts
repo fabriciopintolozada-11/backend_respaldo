@@ -5,6 +5,7 @@ import { ReturnSparePartDto } from '../dto/return-spare-part.dto';
 import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class PartReservationRepository {
@@ -302,7 +303,7 @@ export class PartReservationRepository {
   }
 
   // US-13 / BE-16 / RN-05 / RN-19: atomically set a work order to
-  // EN_ESPERA_DE_REPUESTO. The state transition, the immutable technical
+  // WAITING_FOR_PART. The state transition, the immutable technical
   // history entry and the inventory discrepancy record all run inside a
   // single Prisma transaction (BE-16).
   setAwaitingPart(
@@ -312,10 +313,10 @@ export class PartReservationRepository {
     vehicleId: string,
   ): Promise<AwaitingPartResponseDto> {
     return this.prisma.$transaction(async (transaction) => {
-      // BE-17: update work order status to EN_ESPERA_DE_REPUESTO (RN-05).
+      // BE-17: update work order status to WAITING_FOR_PART (RN-05).
       await transaction.workOrder.update({
         where: { id: workOrderId },
-        data: { status: 'EN_ESPERA_DE_REPUESTO' },
+        data: { status: WorkOrderStatus.WAITING_FOR_PART },
       });
 
       // RN-19: permanent, immutable technical history entry.
@@ -341,7 +342,7 @@ export class PartReservationRepository {
 
       return {
         id: workOrderId,
-        status: 'EN_ESPERA_DE_REPUESTO',
+        status: WorkOrderStatus.WAITING_FOR_PART,
         missingPartId: dto.missingPartId,
         quantity: dto.quantity,
         reason: dto.reason,

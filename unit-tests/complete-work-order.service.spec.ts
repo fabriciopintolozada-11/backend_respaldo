@@ -27,7 +27,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
 
   const baseContext = {
     id: WORK_ORDER_ID,
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     mechanicId: MECHANIC_ID,
     vehicleId: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     receptionistId: RECEPTIONIST_ID,
@@ -35,7 +35,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
 
   const successfulResponse = {
     id: WORK_ORDER_ID,
-    status: 'LISTO_ENTREGA',
+    status: 'READY_FOR_DELIVERY',
     completedAt: new Date(),
     bayNumber: 2,
     finalMileage: 125400,
@@ -78,7 +78,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
       dto,
     );
 
-    expect(result.status).toBe('LISTO_ENTREGA');
+    expect(result.status).toBe('READY_FOR_DELIVERY');
   });
 
   // --- RN-05: state machine validation ---
@@ -86,7 +86,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
   it('rejects completion with 422 when the order is awaiting spare parts (RN-05)', async () => {
     repository.findCompleteContext.mockResolvedValue({
       ...baseContext,
-      status: 'EN_ESPERA_DE_REPUESTO',
+      status: 'WAITING_FOR_PART',
     });
 
     await expect(
@@ -94,43 +94,43 @@ describe('WorkOrdersService - complete (US-19)', () => {
     ).rejects.toThrow(UnprocessableEntityException);
   });
 
-  it('rejects completion with 409 when the order is in RECIBIDO status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'RECIBIDO' });
+  it('rejects completion with 409 when the order is in RECEIVED status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'RECEIVED' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects completion with 409 when the order is in ASIGNADA status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'ASIGNADA' });
+  it('rejects completion with 409 when the order is in ASSIGNED status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'ASSIGNED' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects completion with 409 when the order is in APROBADO status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'APROBADO' });
+  it('rejects completion with 409 when the order is in APPROVED status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'APPROVED' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects completion with 409 when the order is in PRESUPUESTO_ENVIADO status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'PRESUPUESTO_ENVIADO' });
+  it('rejects completion with 409 when the order is in QUOTE_SENT status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'QUOTE_SENT' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects completion with 409 when the order is already in LISTO_ENTREGA status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'LISTO_ENTREGA' });
+  it('rejects completion with 409 when the order is already in READY_FOR_DELIVERY status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'READY_FOR_DELIVERY' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects completion with 409 when the order is already in ENTREGADO status', async () => {
-    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'ENTREGADO' });
+  it('rejects completion with 409 when the order is already in DELIVERED status', async () => {
+    repository.findCompleteContext.mockResolvedValue({ ...baseContext, status: 'DELIVERED' });
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
     ).rejects.toThrow(ConflictException);
@@ -138,25 +138,25 @@ describe('WorkOrdersService - complete (US-19)', () => {
 
   // --- Success cases ---
 
-  it('delegates to repository on valid assigned mechanic + EN_REPARACION', async () => {
+  it('delegates to repository on valid assigned mechanic + IN_REPAIR', async () => {
     repository.findCompleteContext.mockResolvedValue(baseContext);
     repository.completeWorkOrder.mockResolvedValue(successfulResponse);
 
     const result = await service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto);
 
     expect(repository.completeWorkOrder).toHaveBeenCalledWith(WORK_ORDER_ID, dto, MECHANIC_ID);
-    expect(result.status).toBe('LISTO_ENTREGA');
+    expect(result.status).toBe('READY_FOR_DELIVERY');
     expect(result.bayNumber).toBe(2);
   });
 
-  it('delegates to repository on valid workshop lead + EN_REPARACION', async () => {
+  it('delegates to repository on valid workshop lead + IN_REPAIR', async () => {
     repository.findCompleteContext.mockResolvedValue(baseContext);
     repository.completeWorkOrder.mockResolvedValue(successfulResponse);
 
     const result = await service.complete(WORK_ORDER_ID, 'wl-id', 'WORKSHOP_LEAD', dto);
 
     expect(repository.completeWorkOrder).toHaveBeenCalledWith(WORK_ORDER_ID, dto, 'wl-id');
-    expect(result.status).toBe('LISTO_ENTREGA');
+    expect(result.status).toBe('READY_FOR_DELIVERY');
   });
 
   it('delegates an empty DTO (no finalMileage, no notes)', async () => {

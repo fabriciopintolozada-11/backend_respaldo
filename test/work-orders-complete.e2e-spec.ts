@@ -67,16 +67,16 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
 
     const base = { vehicleId, customerId, receptionistId, createdAt: new Date() };
     const repairOrder = await prisma.workOrder.create({
-      data: { ...base, initialComplaint: 'Complete e2e reparación', status: 'EN_REPARACION', mechanicId, assignedAt: new Date() },
+      data: { ...base, initialComplaint: 'Complete e2e reparación', status: 'IN_REPAIR', mechanicId, assignedAt: new Date() },
     });
     const foreignOrder = await prisma.workOrder.create({
-      data: { ...base, initialComplaint: 'Complete e2e ajena', status: 'EN_REPARACION', mechanicId, assignedAt: new Date() },
+      data: { ...base, initialComplaint: 'Complete e2e ajena', status: 'IN_REPAIR', mechanicId, assignedAt: new Date() },
     });
     const waitingOrder = await prisma.workOrder.create({
-      data: { ...base, initialComplaint: 'Complete e2e espera repuesto', status: 'EN_ESPERA_DE_REPUESTO', mechanicId },
+      data: { ...base, initialComplaint: 'Complete e2e espera repuesto', status: 'WAITING_FOR_PART', mechanicId },
     });
     const notRepairOrder = await prisma.workOrder.create({
-      data: { ...base, initialComplaint: 'Complete e2e no en reparación', status: 'RECIBIDO', mechanicId },
+      data: { ...base, initialComplaint: 'Complete e2e no en reparación', status: 'RECEIVED', mechanicId },
     });
     repairOrderId = repairOrder.id;
     foreignOrderId = foreignOrder.id;
@@ -97,7 +97,7 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
     await app.close();
   });
 
-  it('completes a repair, sets LISTO_ENTREGA and frees the bay (US-19, RN-05, RN-14)', async () => {
+  it('completes a repair, sets READY_FOR_DELIVERY and frees the bay (US-19, RN-05, RN-14)', async () => {
     const response = await request(app.getHttpServer())
       .post(`/api/v1/work-orders/${repairOrderId}/complete`)
       .set('Authorization', mechanicAuthorization)
@@ -106,7 +106,7 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
 
     expect(response.body).toMatchObject({
       id: repairOrderId,
-      status: 'LISTO_ENTREGA',
+      status: 'READY_FOR_DELIVERY',
       bayNumber: null,
       finalMileage: 125400,
       closingNotes: 'Radiador reemplazado y probado en ruta',
@@ -114,7 +114,7 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
     expect(typeof response.body.completedAt).toBe('string');
 
     const order = await prisma.workOrder.findUniqueOrThrow({ where: { id: repairOrderId } });
-    expect(order.status).toBe('LISTO_ENTREGA');
+    expect(order.status).toBe('READY_FOR_DELIVERY');
 
     const history = await prisma.technicalHistory.findFirst({ where: { vehicleId } });
     expect(history?.description).toContain('final mileage: 125400 km');
@@ -141,10 +141,10 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
       .send({})
       .expect(200);
 
-    expect(response.body.status).toBe('LISTO_ENTREGA');
+    expect(response.body.status).toBe('READY_FOR_DELIVERY');
 
     const order = await prisma.workOrder.findUniqueOrThrow({ where: { id: foreignOrderId } });
-    expect(order.status).toBe('LISTO_ENTREGA');
+    expect(order.status).toBe('READY_FOR_DELIVERY');
   });
 
   it('rejects concluding an awaiting-spare-parts order with 422 (RN-05)', async () => {
@@ -155,7 +155,7 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
       .expect(422);
   });
 
-  it('rejects concluding a non EN_REPARACION order with 409', async () => {
+  it('rejects concluding a non IN_REPAIR order with 409', async () => {
     await request(app.getHttpServer())
       .post(`/api/v1/work-orders/${notRepairOrderId}/complete`)
       .set('Authorization', mechanicAuthorization)

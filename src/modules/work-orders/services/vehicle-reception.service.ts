@@ -9,6 +9,7 @@ import { ListWorkOrdersResponseDto } from '../dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from '../dto/mechanic-list.response.dto';
 import { QueryTrackingWorkOrdersDto } from '../dto/query-tracking-work-orders.dto';
 import { ListTrackingWorkOrdersResponseDto } from '../dto/list-tracking-work-orders.response.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 function elapsedDays(since: Date, now: number): number {
   return Math.max(0, Math.floor((now - since.getTime()) / 86_400_000));
@@ -19,7 +20,7 @@ function elapsedDays(since: Date, now: number): number {
 export const STALE_QUOTE_THRESHOLD_DAYS = 15;
 
 // SUP-15: the schema has no work_orders.quote_sent_at column; the work order
-// transitions to PRESUPUESTO_ENVIADO in the same transaction that creates the
+// transitions to QUOTE_SENT in the same transaction that creates the
 // Quote (quote.repository.ts), so Quote.createdAt is the formal emission date.
 export const STALE_QUOTE_REFERENCE = 'quote.createdAt as quote emission date (SUP-15)';
 
@@ -63,12 +64,12 @@ export class VehicleReceptionService {
       let daysWaitingApproval: number | null = null;
 
       // US-13 / RN-05: awaiting part with the pending warehouse discrepancy.
-      if (row.status === 'EN_ESPERA_DE_REPUESTO' && row.discrepancy) {
+      if (row.status === WorkOrderStatus.WAITING_FOR_PART && row.discrepancy) {
         missingPartName = row.discrepancy.sparePartName;
         pausedReason = row.discrepancy.pausedReason;
       }
       // Rendezvous awaiting customer approval after the budget was sent.
-      if (row.status === 'PRESUPUESTO_ENVIADO' && row.quoteCreatedAt) {
+      if (row.status === WorkOrderStatus.QUOTE_SENT && row.quoteCreatedAt) {
         pausedReason = 'Awaiting customer approval';
         daysWaitingApproval = elapsedDays(row.quoteCreatedAt, now);
       }
@@ -118,7 +119,7 @@ export class VehicleReceptionService {
     };
   }
 
-  // HU-12: list work orders in EN_DIAGNOSTICO that are ready to be quoted.
+  // HU-12: list work orders in IN_DIAGNOSIS that are ready to be quoted.
   getPendingQuoteOrders(): Promise<PendingQuoteWorkOrderResponseDto[]> {
     return this.repository.findPendingQuoteOrders().then((rows) =>
       rows.map((row) => ({

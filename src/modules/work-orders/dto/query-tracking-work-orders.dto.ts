@@ -1,20 +1,21 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 // US-05 (RN-05): status vocabulary of the work-order state machine. The same
 // list is used as an allowlist for the tracking filter so queries are explicit.
 export const WORK_ORDER_STATUSES = [
-  'RECIBIDO',
-  'ASIGNADA',
-  'EN_DIAGNOSTICO',
-  'PRESUPUESTO_ENVIADO',
-  'APROBADO',
-  'EN_REPARACION',
-  'EN_ESPERA_DE_REPUESTO',
-  'LISTO_ENTREGA',
-  'ENTREGADO',
-  'FINALIZADO',
+  WorkOrderStatus.RECEIVED,
+  WorkOrderStatus.ASSIGNED,
+  WorkOrderStatus.IN_DIAGNOSIS,
+  WorkOrderStatus.QUOTE_SENT,
+  WorkOrderStatus.APPROVED,
+  WorkOrderStatus.IN_REPAIR,
+  WorkOrderStatus.WAITING_FOR_PART,
+  WorkOrderStatus.READY_FOR_DELIVERY,
+  WorkOrderStatus.DELIVERED,
+  WorkOrderStatus.FINALIZED,
 ] as const;
 
 // BE-T05.1: reactively filters the work-order tracking summary by license
@@ -40,7 +41,7 @@ export class QueryTrackingWorkOrdersDto {
   // 'true'/'false', so the boolean is coerced with @Transform.
   @ApiPropertyOptional({
     default: false,
-    description: 'Only return PRESUPUESTO_ENVIADO orders waiting approval for 15+ days (US-16 / RN-06)',
+    description: 'Only return QUOTE_SENT orders waiting approval for 15+ days (US-16 / RN-06)',
   })
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')

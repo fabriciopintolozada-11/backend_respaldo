@@ -30,7 +30,7 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
 
   const baseContext = {
     id: WORK_ORDER_ID,
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     mechanicId: MECHANIC_ID,
     vehicleId: VEHICLE_ID,
     quote: {
@@ -42,7 +42,7 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
 
   const successfulResponse = {
     id: WORK_ORDER_ID,
-    status: 'EN_ESPERA_DE_REPUESTO',
+    status: 'WAITING_FOR_PART',
     missingPartId: SPARE_PART_ID,
     quantity: 2,
     reason: 'Part not physically available in warehouse',
@@ -86,15 +86,15 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
       dto,
     );
 
-    expect(result.status).toBe('EN_ESPERA_DE_REPUESTO');
+    expect(result.status).toBe('WAITING_FOR_PART');
   });
 
   // --- RN-05: state machine validation ---
 
-  it('rejects when work order is in RECIBIDO status (RN-05)', async () => {
+  it('rejects when work order is in RECEIVED status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
     });
 
     await expect(
@@ -102,10 +102,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in ASIGNADA status (RN-05)', async () => {
+  it('rejects when work order is in ASSIGNED status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'ASIGNADA',
+      status: 'ASSIGNED',
     });
 
     await expect(
@@ -113,10 +113,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in EN_DIAGNOSTICO status (RN-05)', async () => {
+  it('rejects when work order is in IN_DIAGNOSIS status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'EN_DIAGNOSTICO',
+      status: 'IN_DIAGNOSIS',
     });
 
     await expect(
@@ -124,10 +124,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in PRESUPUESTO_ENVIADO status (RN-05)', async () => {
+  it('rejects when work order is in QUOTE_SENT status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
     });
 
     await expect(
@@ -135,10 +135,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in APROBADO status (RN-05)', async () => {
+  it('rejects when work order is in APPROVED status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'APROBADO',
+      status: 'APPROVED',
     });
 
     await expect(
@@ -146,10 +146,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in EN_ESPERA_DE_REPUESTO status (RN-05)', async () => {
+  it('rejects when work order is in WAITING_FOR_PART status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'EN_ESPERA_DE_REPUESTO',
+      status: 'WAITING_FOR_PART',
     });
 
     await expect(
@@ -157,10 +157,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in FINALIZADO status (RN-05)', async () => {
+  it('rejects when work order is in FINALIZED status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'FINALIZADO',
+      status: 'FINALIZED',
     });
 
     await expect(
@@ -168,10 +168,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in LISTO_ENTREGA status (RN-05)', async () => {
+  it('rejects when work order is in READY_FOR_DELIVERY status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'LISTO_ENTREGA',
+      status: 'READY_FOR_DELIVERY',
     });
 
     await expect(
@@ -179,10 +179,10 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('rejects when work order is in ENTREGADO status (RN-05)', async () => {
+  it('rejects when work order is in DELIVERED status (RN-05)', async () => {
     repository.findAwaitingPartContext.mockResolvedValue({
       ...baseContext,
-      status: 'ENTREGADO',
+      status: 'DELIVERED',
     });
 
     await expect(
@@ -230,7 +230,7 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
 
   // --- Success cases ---
 
-  it('delegates to repository on valid mechanic + EN_REPARACION + valid part', async () => {
+  it('delegates to repository on valid mechanic + IN_REPAIR + valid part', async () => {
     repository.findAwaitingPartContext.mockResolvedValue(baseContext);
     repository.setAwaitingPart.mockResolvedValue(successfulResponse);
 
@@ -247,12 +247,12 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
       MECHANIC_ID,
       VEHICLE_ID,
     );
-    expect(result.status).toBe('EN_ESPERA_DE_REPUESTO');
+    expect(result.status).toBe('WAITING_FOR_PART');
     expect(result.missingPartId).toBe(SPARE_PART_ID);
     expect(result.quantity).toBe(2);
   });
 
-  it('delegates to repository on valid workshop lead + EN_REPARACION + valid part', async () => {
+  it('delegates to repository on valid workshop lead + IN_REPAIR + valid part', async () => {
     repository.findAwaitingPartContext.mockResolvedValue(baseContext);
     repository.setAwaitingPart.mockResolvedValue(successfulResponse);
 
@@ -263,7 +263,7 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
       dto,
     );
 
-    expect(result.status).toBe('EN_ESPERA_DE_REPUESTO');
+    expect(result.status).toBe('WAITING_FOR_PART');
   });
 
   it('accepts a part even when its quote_part status is not RESERVED', async () => {
@@ -287,6 +287,6 @@ describe('WorkOrdersService - setAwaitingPart (US-13)', () => {
       dto,
     );
 
-    expect(result.status).toBe('EN_ESPERA_DE_REPUESTO');
+    expect(result.status).toBe('WAITING_FOR_PART');
   });
 });

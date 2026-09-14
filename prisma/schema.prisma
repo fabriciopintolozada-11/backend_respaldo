@@ -73,7 +73,7 @@ model WorkOrder {
   customerId       String    @db.Uuid @map("customer_id")
   receptionistId   String    @db.Uuid @map("receptionist_id")
   initialComplaint String @map("initial_complaint")
-  status           String    @default("RECIBIDO") @db.VarChar(30) @map("status")
+  status           String    @default("RECEIVED") @db.VarChar(30) @map("status")
   mechanicId       String?   @db.Uuid @map("mechanic_id")
   assignedAt       DateTime? @db.Timestamptz(6) @map("assigned_at")
   createdAt        DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")

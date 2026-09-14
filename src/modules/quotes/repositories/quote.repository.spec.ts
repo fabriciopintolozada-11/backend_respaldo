@@ -52,7 +52,7 @@ describe('QuoteRepository', () => {
     }));
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'work-order-id' },
-      data: { status: 'PRESUPUESTO_ENVIADO' },
+      data: { status: 'QUOTE_SENT' },
     });
     expect(result.total).toBe('100');
     expect(result.currency).toBe('BOB');

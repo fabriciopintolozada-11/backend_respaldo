@@ -8,6 +8,7 @@ import { QuoteDecision, QuoteDecisionResponseDto } from '../dto/quote-decision-r
 import { QuoteResponseDto } from '../dto/quote-response.dto';
 import { QuoteApprovalDetailResponseDto } from '../dto/quote-approval-query-response.dto';
 import { releaseReservedParts } from '../../work-orders/repositories/reserved-parts-release';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class QuoteRepository {
@@ -93,7 +94,7 @@ export class QuoteRepository {
         partItems,
         { total, laborSubtotal, partsSubtotal },
       );
-      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'PRESUPUESTO_ENVIADO' } });
+      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: WorkOrderStatus.QUOTE_SENT } });
       return { id: quote.id, workOrderId, items: quote.details.map((item: { id: string; description: string; itemType: string; quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; subtotal: Prisma.Decimal }) => ({ id: item.id, description: item.description, itemType: item.itemType as QuoteItemType, quantity: item.quantity.toString(), unitPrice: item.unitPrice.toString(), subtotal: item.subtotal.toString() })), total: quote.total.toString(), laborSubtotal: laborSubtotal.toString(), partsSubtotal: partsSubtotal.toString(), currency: quote.currency, createdAt: quote.createdAt };
     });
   }
@@ -107,7 +108,7 @@ export class QuoteRepository {
 
   findApprovalPage(page: number, pageSize: number) {
     return this.prisma.quote.findMany({
-      where: { workOrder: { status: 'PRESUPUESTO_ENVIADO' } },
+      where: { workOrder: { status: WorkOrderStatus.QUOTE_SENT } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -137,12 +138,12 @@ export class QuoteRepository {
   }
 
   countApprovalQuotes(): Promise<number> {
-    return this.prisma.quote.count({ where: { workOrder: { status: 'PRESUPUESTO_ENVIADO' } } });
+    return this.prisma.quote.count({ where: { workOrder: { status: WorkOrderStatus.QUOTE_SENT } } });
   }
 
   async findApprovalDetail(workOrderId: string): Promise<QuoteApprovalDetailResponseDto | null> {
     const quote = await this.prisma.quote.findFirst({
-      where: { workOrderId, workOrder: { status: 'PRESUPUESTO_ENVIADO' } },
+      where: { workOrderId, workOrder: { status: WorkOrderStatus.QUOTE_SENT } },
       select: {
         id: true,
         workOrderId: true,
@@ -314,7 +315,7 @@ export class QuoteRepository {
         select: { id: true, workOrder: { select: { id: true, vehicleId: true, mechanicId: true, status: true } }, parts: { where: { status: 'PROPOSED' }, select: { id: true, sparePartId: true, quantity: true, status: true } }, approvals: { select: { id: true } } },
       });
       if (!quote) throw new NotFoundException('Quote not found');
-      if (quote.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
+      if (quote.workOrder.status !== WorkOrderStatus.QUOTE_SENT) throw new ConflictException('Quote is not awaiting a decision');
       if (quote.approvals.length > 0) throw new ConflictException('Quote already has a decision');
 
       for (const part of quote.parts) {
@@ -326,7 +327,7 @@ export class QuoteRepository {
         await tx.quotePart.update({ where: { id: part.id }, data: { status: 'RESERVED' } });
       }
 
-      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'APROBADO' } });
+      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: WorkOrderStatus.APPROVED } });
       await tx.technicalHistory.create({ data: { vehicleId: quote.workOrder.vehicleId, description: `Quote approved for work order ${workOrderId}` } });
       if (quote.workOrder.mechanicId) {
         await tx.notification.create({
@@ -347,7 +348,7 @@ export class QuoteRepository {
         select: { id: true, workOrder: { select: { id: true, vehicleId: true, status: true } }, parts: { select: { id: true, status: true } }, approvals: { select: { id: true } } },
       });
       if (!quote) throw new NotFoundException('Quote not found');
-      if (quote.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
+      if (quote.workOrder.status !== WorkOrderStatus.QUOTE_SENT) throw new ConflictException('Quote is not awaiting a decision');
       if (quote.approvals.length > 0) throw new ConflictException('Quote already has a decision');
 
       // HU-07 / BE-E03: defensively release any part still RESERVED for this
@@ -363,7 +364,7 @@ export class QuoteRepository {
         where: { quoteId: quote.id, status: { in: ['PROPOSED', 'RESERVED'] } },
         data: { status: 'RELEASED' },
       });
-      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'RECHAZADO' } });
+      await tx.workOrder.update({ where: { id: workOrderId }, data: { status: WorkOrderStatus.REJECTED } });
       await tx.technicalHistory.create({ data: { vehicleId: quote.workOrder.vehicleId, description: `Quote rejected for work order ${workOrderId}: ${dto.reason}` } });
       const approval = await tx.quoteApproval.create({ data: { quoteId: quote.id, decision: QuoteDecision.REJECTED, reason: dto.reason, recordedBy } });
       return { id: approval.id, quoteId: approval.quoteId, workOrderId, decision: QuoteDecision.REJECTED, reason: dto.reason, createdAt: approval.createdAt };

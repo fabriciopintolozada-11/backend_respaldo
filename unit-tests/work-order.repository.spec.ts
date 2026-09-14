@@ -34,7 +34,7 @@ describe('WorkOrderRepository (HU-01)', () => {
     tx.customer.upsert.mockResolvedValue({ id: customerId });
     tx.vehicle.upsert.mockResolvedValue({ id: vehicleId, customerId });
     tx.workOrder.create.mockResolvedValue({
-      id: 'wo-1', vehicleId, customerId, status: 'RECIBIDO', initialComplaint: dto.initialComplaint, createdAt: new Date(),
+      id: 'wo-1', vehicleId, customerId, status: 'RECEIVED', initialComplaint: dto.initialComplaint, createdAt: new Date(),
     });
     tx.technicalHistory.create.mockResolvedValue({});
 
@@ -46,7 +46,7 @@ describe('WorkOrderRepository (HU-01)', () => {
       data: { vehicleId, customerId, receptionistId: 'receptionist-id', initialComplaint: dto.initialComplaint },
       select: { id: true, vehicleId: true, customerId: true, status: true, initialComplaint: true, createdAt: true },
     });
-    expect(result.status).toBe('RECIBIDO');
+    expect(result.status).toBe('RECEIVED');
   });
 
   it('reuses existing vehicle and links work order to original customer (HU-01 Escenario 2)', async () => {
@@ -60,7 +60,7 @@ describe('WorkOrderRepository (HU-01)', () => {
       plate: 'ABC-123',
     });
     tx.workOrder.create.mockResolvedValue({
-      id: 'wo-2', vehicleId, customerId: originalCustomerId, status: 'RECIBIDO', initialComplaint: dto.initialComplaint, createdAt: new Date(),
+      id: 'wo-2', vehicleId, customerId: originalCustomerId, status: 'RECEIVED', initialComplaint: dto.initialComplaint, createdAt: new Date(),
     });
     tx.technicalHistory.create.mockResolvedValue({});
 
@@ -77,7 +77,7 @@ describe('WorkOrderRepository (HU-01)', () => {
     tx.customer.upsert.mockResolvedValue({ id: 'c1' });
     tx.vehicle.upsert.mockResolvedValue({ id: 'v1', customerId: 'c1' });
     tx.workOrder.create.mockResolvedValue({
-      id: 'wo-3', vehicleId: 'v1', customerId: 'c1', status: 'RECIBIDO', initialComplaint: 'Brakes squeaking', createdAt: new Date(),
+      id: 'wo-3', vehicleId: 'v1', customerId: 'c1', status: 'RECEIVED', initialComplaint: 'Brakes squeaking', createdAt: new Date(),
     });
     tx.technicalHistory.create.mockResolvedValue({});
 
@@ -131,7 +131,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
   it('persists the diagnostic, updates the work order status and appends immutable history (RN-19)', async () => {
     const { repository, tx } = buildFixture();
 
-    await repository.createDiagnostic(workOrderId, diagnostic, 'EN_DIAGNOSTICO');
+    await repository.createDiagnostic(workOrderId, diagnostic, 'IN_DIAGNOSIS');
 
     expect(tx.diagnostic.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -147,7 +147,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
     expect(tx.workOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: workOrderId },
-        data: { status: 'EN_DIAGNOSTICO' },
+        data: { status: 'IN_DIAGNOSIS' },
       }),
     );
     expect(tx.technicalHistory.create).toHaveBeenCalledWith({
@@ -158,15 +158,15 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
     });
   });
 
-  it('suspends the order to PRESUPUESTO_ENVIADO inside the same transaction when there are additional findings (RN-03)', async () => {
+  it('suspends the order to QUOTE_SENT inside the same transaction when there are additional findings (RN-03)', async () => {
     const { repository, tx } = buildFixture();
 
-    await repository.createDiagnostic(workOrderId, diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
+    await repository.createDiagnostic(workOrderId, diagnostic, 'QUOTE_SENT', 'mechanic-id');
 
     expect(tx.workOrder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: workOrderId },
-        data: { status: 'PRESUPUESTO_ENVIADO' },
+        data: { status: 'QUOTE_SENT' },
       }),
     );
     expect(tx.technicalHistory.create).toHaveBeenCalledTimes(1);
@@ -175,7 +175,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
   it('captures the reported finding as a pending additional quote annex (US-21 / RN-03)', async () => {
     const { repository, tx } = buildFixture();
 
-    await repository.createDiagnostic(workOrderId, diagnostic, 'PRESUPUESTO_ENVIADO', 'mechanic-id');
+    await repository.createDiagnostic(workOrderId, diagnostic, 'QUOTE_SENT', 'mechanic-id');
 
     expect(tx.additionalFinding.create).toHaveBeenCalledWith({
       data: {
@@ -192,7 +192,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
   it('does not create an annex until a new finding is reported during repair (HU-11 initial)', async () => {
     const { repository, tx } = buildFixture();
 
-    await repository.createDiagnostic(workOrderId, diagnostic, 'EN_DIAGNOSTICO', 'mechanic-id');
+    await repository.createDiagnostic(workOrderId, diagnostic, 'IN_DIAGNOSIS', 'mechanic-id');
 
     expect(tx.additionalFinding.create).not.toHaveBeenCalled();
   });
@@ -200,7 +200,7 @@ describe('WorkOrderRepository.createDiagnostic (HU-11)', () => {
   it('returns an explicit non-financial allowlist so no prices leak to the mechanic (RN-16)', async () => {
     const { repository } = buildFixture();
 
-    const result = await repository.createDiagnostic(workOrderId, diagnostic, 'EN_DIAGNOSTICO');
+    const result = await repository.createDiagnostic(workOrderId, diagnostic, 'IN_DIAGNOSIS');
 
     const keys = Object.keys(result);
     expect(keys).toEqual([

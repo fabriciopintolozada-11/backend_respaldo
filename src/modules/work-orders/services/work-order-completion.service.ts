@@ -3,12 +3,13 @@ import { WorkOrderRepository } from '../repositories/work-order.repository';
 import { CompleteWorkOrderDto } from '../dto/complete-work-order.dto';
 import { CompleteWorkOrderResponseDto } from '../dto/complete-work-order.response.dto';
 import { UserRole } from '../../../common/enums/user-role.enum';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class WorkOrderCompletionService {
   constructor(private readonly repository: WorkOrderRepository) {}
 
-  // US-19: conclude a repair, set the work order to LISTO_ENTREGA and free
+  // US-19: conclude a repair, set the work order to READY_FOR_DELIVERY and free
   // its physical bay (BE-T19.2, RN-05, RN-14, RN-19). All rules live here
   // (BE-06); the repository performs the atomic persistence (BE-16).
   async complete(
@@ -29,16 +30,16 @@ export class WorkOrderCompletionService {
     }
 
     // RN-05: a work order waiting for spare parts must not be concluded.
-    if (context.status === 'EN_ESPERA_DE_REPUESTO') {
+    if (context.status === WorkOrderStatus.WAITING_FOR_PART) {
       throw new UnprocessableEntityException(
         'RN-05: work order is awaiting spare parts and cannot be concluded',
       );
     }
 
-    // State machine (E4): only EN_REPARACION can be concluded.
-    if (context.status !== 'EN_REPARACION') {
+    // State machine (E4): only IN_REPAIR can be concluded.
+    if (context.status !== WorkOrderStatus.IN_REPAIR) {
       throw new ConflictException(
-        'Work order must be in EN_REPARACION to conclude the repair',
+        'Work order must be in IN_REPAIR to conclude the repair',
       );
     }
 

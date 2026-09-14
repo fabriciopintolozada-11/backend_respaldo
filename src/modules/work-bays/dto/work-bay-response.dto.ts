@@ -19,7 +19,7 @@ export class WorkBayMonitoringResponseDto {
   @ApiProperty() bayNumber!: number;
   @ApiProperty() isOccupied!: boolean;
   // Coarse physical status aligned with the frontend BayStatus contract:
-  // LIBRE | OCUPADA | ESPERA_REPUESTO | MANTENIMIENTO.
+  // FREE | OCCUPIED | WAITING_FOR_PART | MAINTENANCE.
   @ApiProperty() status!: string;
   @ApiProperty() currentWorkOrderId!: string | null;
   @ApiProperty() currentWorkOrder!: WorkOrderBaySummaryDto | null;

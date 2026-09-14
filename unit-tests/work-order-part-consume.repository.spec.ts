@@ -6,7 +6,7 @@ import { ConsumeSparePartDto } from '../src/modules/work-orders/dto/consume-spar
 // atomic Prisma transaction. These tests assert the stock decrement, the
 // INSTALLED status change, the kardex record and the negative-stock guard.
 describe('WorkOrderRepository.consumePart (HU-07)', () => {
-  const orderWithPart = (status = 'APROBADO', partStatus = 'RESERVED', quantity = 1) => ({
+  const orderWithPart = (status = 'APPROVED', partStatus = 'RESERVED', quantity = 1) => ({
     id: 'wo-1',
     status,
     vehicleId: 'veh-1',
@@ -54,7 +54,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
 
-    const result = await repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION');
+    const result = await repository.consumePart('wo-1', dto, 'mech-1', 'IN_REPAIR');
 
     expect(tx.sparePart.updateMany).toHaveBeenCalledWith({
       where: { id: 'sp-1', physicalStock: { gte: 1 }, reservedStock: { gte: 1 } },
@@ -70,7 +70,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     });
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'wo-1' },
-      data: { status: 'EN_REPARACION' },
+      data: { status: 'IN_REPAIR' },
     });
     expect(tx.stockMovement.create).toHaveBeenCalledWith({
       data: {
@@ -88,9 +88,9 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
   it('does not transition state when nextStatus equals the current status', async () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
-    tx.workOrder.findUnique = jest.fn().mockResolvedValue(orderWithPart('EN_REPARACION'));
+    tx.workOrder.findUnique = jest.fn().mockResolvedValue(orderWithPart('IN_REPAIR'));
 
-    await repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION');
+    await repository.consumePart('wo-1', dto, 'mech-1', 'IN_REPAIR');
 
     expect(tx.workOrder.update).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
 
-    await repository.consumePart('wo-1', { ...dto, notes: 'Filtro llegó con el empaque roto' }, 'mech-1', 'EN_REPARACION');
+    await repository.consumePart('wo-1', { ...dto, notes: 'Filtro llegó con el empaque roto' }, 'mech-1', 'IN_REPAIR');
 
     expect(tx.stockMovement.create).toHaveBeenCalledWith({
       data: {
@@ -117,7 +117,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     const tx = makeTx({ sparePart: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) } });
     const { repository } = makeRepository(tx);
 
-    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION'))
+    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'IN_REPAIR'))
       .rejects.toThrow(UnprocessableEntityException);
     expect(tx.quotePart.update).not.toHaveBeenCalled();
     expect(tx.stockMovement.create).not.toHaveBeenCalled();
@@ -127,9 +127,9 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
   it('rejects consumption when the part is not RESERVED (RN-07)', async () => {
     const tx = makeTx();
     const { repository } = makeRepository(tx);
-    tx.workOrder.findUnique = jest.fn().mockResolvedValue(orderWithPart('APROBADO', 'INSTALLED'));
+    tx.workOrder.findUnique = jest.fn().mockResolvedValue(orderWithPart('APPROVED', 'INSTALLED'));
 
-    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION'))
+    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'IN_REPAIR'))
       .rejects.toThrow(UnprocessableEntityException);
     expect(tx.sparePart.updateMany).not.toHaveBeenCalled();
   });
@@ -138,7 +138,7 @@ describe('WorkOrderRepository.consumePart (HU-07)', () => {
     const tx = makeTx({ workOrder: { findUnique: jest.fn().mockResolvedValue(null), update: jest.fn() } });
     const { repository } = makeRepository(tx);
 
-    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'EN_REPARACION')).rejects.toThrow('Work order not found');
+    await expect(repository.consumePart('wo-1', dto, 'mech-1', 'IN_REPAIR')).rejects.toThrow('Work order not found');
     expect(tx.sparePart.updateMany).not.toHaveBeenCalled();
   });
 });

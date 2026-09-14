@@ -12,7 +12,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
 
   const baseRow = {
     id: 'wo-1',
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     createdAt: new Date('2026-09-01T00:00:00Z'),
     plate: '4589-KXA',
     model: 'Hilux',
@@ -42,11 +42,11 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     repository.findTrackingSummary.mockResolvedValue([]);
     repository.countTrackingSummary.mockResolvedValue(0);
 
-    await service.getTrackingSummary({ licensePlate: ' 4589-kxa ', status: 'EN_REPARACION', workBayId: 'bay-1' });
+    await service.getTrackingSummary({ licensePlate: ' 4589-kxa ', status: 'IN_REPAIR', workBayId: 'bay-1' });
 
     expect(repository.findTrackingSummary).toHaveBeenCalledWith({
       licensePlate: '4589-KXA',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       workBayId: 'bay-1',
       staleQuoteCutoff: undefined,
       page: 1,
@@ -54,7 +54,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     });
     expect(repository.countTrackingSummary).toHaveBeenCalledWith({
       licensePlate: '4589-KXA',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       workBayId: 'bay-1',
       staleQuoteCutoff: undefined,
     });
@@ -100,7 +100,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     repository.findTrackingSummary.mockResolvedValue([
       {
         ...baseRow,
-        status: 'EN_ESPERA_DE_REPUESTO',
+        status: 'WAITING_FOR_PART',
         discrepancy: {
           sparePartName: 'Amortiguador Delantero a Gas KYB Excel-G',
           pausedReason: 'Part not found in warehouse shelf',
@@ -115,10 +115,10 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     expect(tracking.daysWaitingApproval).toBeNull();
   });
 
-  it('computes the days waiting for customer approval on PRESUPUESTO_ENVIADO', async () => {
+  it('computes the days waiting for customer approval on QUOTE_SENT', async () => {
     const quoteCreatedAt = new Date('2026-09-03T00:00:00Z');
     repository.findTrackingSummary.mockResolvedValue([
-      { ...baseRow, status: 'PRESUPUESTO_ENVIADO', quoteCreatedAt },
+      { ...baseRow, status: 'QUOTE_SENT', quoteCreatedAt },
     ]);
 
     const tracking = (await service.getTrackingSummary({})).data[0];
@@ -132,7 +132,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
   it('flags an order as stale when it awaits approval for 15+ days (US-16 / RN-06)', async () => {
     const quoteCreatedAt = new Date('2026-08-20T00:00:00Z');
     repository.findTrackingSummary.mockResolvedValue([
-      { ...baseRow, status: 'PRESUPUESTO_ENVIADO', quoteCreatedAt },
+      { ...baseRow, status: 'QUOTE_SENT', quoteCreatedAt },
     ]);
 
     const tracking = (await service.getTrackingSummary({})).data[0];
@@ -141,9 +141,9 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     expect(tracking.isStaleQuote).toBe(true);
   });
 
-  it('does not flag non-PRESUPUESTO_ENVIADO orders as stale (US-16 / RN-06)', async () => {
+  it('does not flag non-QUOTE_SENT orders as stale (US-16 / RN-06)', async () => {
     repository.findTrackingSummary.mockResolvedValue([
-      { ...baseRow, status: 'EN_REPARACION', quoteCreatedAt: new Date('2026-08-01T00:00:00Z') },
+      { ...baseRow, status: 'IN_REPAIR', quoteCreatedAt: new Date('2026-08-01T00:00:00Z') },
     ]);
 
     const tracking = (await service.getTrackingSummary({})).data[0];
@@ -205,7 +205,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     repository.findTrackingSummary.mockResolvedValue([
       {
         ...baseRow,
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         quoteCreatedAt: new Date('2026-09-03T00:00:00Z'),
         additionalFindingDescription: 'Fuga de aceite detectada en el motor',
       },

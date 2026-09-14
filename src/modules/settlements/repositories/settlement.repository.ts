@@ -7,6 +7,7 @@ import { ApplyDiscountDto } from '../dto/apply-discount.dto';
 import { VoidAdjustmentDto } from '../dto/void-adjustment.dto';
 import { SettlementAdjustmentResponseDto, AdjustmentType } from '../dto/settlement-adjustment.response.dto';
 import { releaseReservedParts } from '../../work-orders/repositories/reserved-parts-release';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class SettlementRepository {
@@ -61,7 +62,7 @@ export class SettlementRepository {
   }
 
   // US-20 / BE-16 / RN-21 / RN-19: atomically settle and deliver a vehicle.
-  // The status transition to ENTREGADO, the handover timestamp, the payment
+  // The status transition to DELIVERED, the handover timestamp, the payment
   // data, the charged total and the immutable technical history entry all run
   // inside a single Prisma transaction (BE-16).
   deliverWorkOrder(
@@ -95,8 +96,8 @@ export class SettlementRepository {
       if (!order) throw new NotFoundException('Work order not found');
       // Defensive guard inside the transaction (BE-16): prevents a concurrent
       // double settlement of the same work order (RN-21).
-      if (order.status !== 'LISTO_ENTREGA') {
-        throw new ConflictException('Work order must be in LISTO_ENTREGA to be delivered');
+      if (order.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+        throw new ConflictException('Work order must be in READY_FOR_DELIVERY to be delivered');
       }
       if (order.deliveredAt) {
         throw new ConflictException('Work order has already been delivered');
@@ -129,7 +130,7 @@ export class SettlementRepository {
       await transaction.workOrder.update({
         where: { id: workOrderId },
         data: {
-          status: 'ENTREGADO',
+          status: WorkOrderStatus.DELIVERED,
           deliveredAt,
           paymentMethod: dto.paymentMethod,
           receiptNumber: dto.receiptNumber,
@@ -161,7 +162,7 @@ export class SettlementRepository {
       // precision loss and inconsistent trailing zeros.
       return {
         id: workOrderId,
-        status: 'ENTREGADO',
+        status: WorkOrderStatus.DELIVERED,
         deliveredAt,
         paymentMethod: dto.paymentMethod,
         receiptNumber: dto.receiptNumber,
@@ -204,8 +205,8 @@ export class SettlementRepository {
         },
       });
       if (!order) throw new NotFoundException('Work order not found');
-      if (order.status !== 'LISTO_ENTREGA') {
-        throw new ConflictException('Work order must be in LISTO_ENTREGA to apply discounts');
+      if (order.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+        throw new ConflictException('Work order must be in READY_FOR_DELIVERY to apply discounts');
       }
       if (order.deliveredAt) {
         throw new ConflictException('Work order has already been delivered');
@@ -290,8 +291,8 @@ export class SettlementRepository {
         },
       });
       if (!order) throw new NotFoundException('Work order not found');
-      if (order.status !== 'LISTO_ENTREGA') {
-        throw new ConflictException('Work order must be in LISTO_ENTREGA to void adjustments');
+      if (order.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+        throw new ConflictException('Work order must be in READY_FOR_DELIVERY to void adjustments');
       }
       if (order.deliveredAt) {
         throw new ConflictException('Work order has already been delivered');

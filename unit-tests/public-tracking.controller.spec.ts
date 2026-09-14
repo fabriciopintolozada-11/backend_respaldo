@@ -21,7 +21,7 @@ describe('PublicTrackingController (US-17 / BE-T17)', () => {
     const response = {
       workOrderNumber: 'work-order-id',
       vehicleModel: 'Hilux',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       receivedAt: new Date('2026-09-10T12:00:00Z'),
       readyForPickup: false,
       tasksSummary: ['Cambio de aceite'],

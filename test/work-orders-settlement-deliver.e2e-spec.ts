@@ -78,15 +78,15 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     const createOrder = (initialComplaint: string, status: string) =>
       prisma.workOrder.create({ data: { ...base, initialComplaint, status } });
 
-    const readyOrder = await createOrder('Deliver e2e listo para entrega', 'LISTO_ENTREGA');
+    const readyOrder = await createOrder('Deliver e2e listo para entrega', 'READY_FOR_DELIVERY');
     readyOrderId = readyOrder.id;
-    const reservedOnlyOrder = await createOrder('Deliver e2e solo reservados', 'LISTO_ENTREGA');
+    const reservedOnlyOrder = await createOrder('Deliver e2e solo reservados', 'READY_FOR_DELIVERY');
     reservedOnlyOrderId = reservedOnlyOrder.id;
-    const notReadyOrder = await createOrder('Deliver e2e en reparacion', 'EN_REPARACION');
+    const notReadyOrder = await createOrder('Deliver e2e en reparacion', 'IN_REPAIR');
     notReadyOrderId = notReadyOrder.id;
-    const noQuoteOrder = await createOrder('Deliver e2e sin presupuesto', 'LISTO_ENTREGA');
+    const noQuoteOrder = await createOrder('Deliver e2e sin presupuesto', 'READY_FOR_DELIVERY');
     noQuoteOrderId = noQuoteOrder.id;
-    const discountableOrder = await createOrder('Deliver e2e con descuento', 'LISTO_ENTREGA');
+    const discountableOrder = await createOrder('Deliver e2e con descuento', 'READY_FOR_DELIVERY');
     discountableOrderId = discountableOrder.id;
 
     const readyQuote = await prisma.quote.create({
@@ -158,7 +158,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
 
     expect(response.body).toMatchObject({
       workOrderId: readyOrderId,
-      status: 'LISTO_ENTREGA',
+      status: 'READY_FOR_DELIVERY',
       plate: testPlate,
       brand: 'Toyota',
       model: 'Corolla',
@@ -196,7 +196,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     expect(response.body.total).toBe('0.00');
   });
 
-  it('rejects settlement for a non LISTO_ENTREGA order with 409 (RN-05)', async () => {
+  it('rejects settlement for a non READY_FOR_DELIVERY order with 409 (RN-05)', async () => {
     await request(app.getHttpServer())
       .get(`/api/v1/work-orders/${notReadyOrderId}/settlement`)
       .set('Authorization', receptionistAuthorization)
@@ -226,7 +226,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
 
     expect(response.body).toMatchObject({
       id: readyOrderId,
-      status: 'ENTREGADO',
+      status: 'DELIVERED',
       paymentMethod: 'CASH',
       receiptNumber: 'F2026-E2E-001',
       deliveryNotes: 'Entregado con llaves',
@@ -235,7 +235,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
     expect(new Prisma.Decimal(response.body.totalCharged).equals(new Prisma.Decimal('950.00'))).toBe(true);
 
     const order = await prisma.workOrder.findUniqueOrThrow({ where: { id: readyOrderId } });
-    expect(order.status).toBe('ENTREGADO');
+    expect(order.status).toBe('DELIVERED');
     expect(order.paymentMethod).toBe('CASH');
     expect(order.receiptNumber).toBe('F2026-E2E-001');
     expect(order.deliveryNotes).toBe('Entregado con llaves');
@@ -259,7 +259,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       .send({ paymentMethod: 'QR_TRANSFER', receiptNumber: 'F2026-E2E-002' })
       .expect(200);
 
-    expect(response.body.status).toBe('ENTREGADO');
+    expect(response.body.status).toBe('DELIVERED');
     expect(new Prisma.Decimal(response.body.totalCharged).equals(new Prisma.Decimal('200.00'))).toBe(true);
   });
 
@@ -270,7 +270,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       .send({ paymentMethod: 'CARD', receiptNumber: 'F2026-E2E-003' })
       .expect(200);
 
-    expect(response.body.status).toBe('ENTREGADO');
+    expect(response.body.status).toBe('DELIVERED');
     expect(response.body.totalCharged).toBe('0.00');
   });
 
@@ -289,7 +289,7 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       .expect(409);
   });
 
-  it('rejects delivery for a non LISTO_ENTREGA order with 409 (RN-05)', async () => {
+  it('rejects delivery for a non READY_FOR_DELIVERY order with 409 (RN-05)', async () => {
     await request(app.getHttpServer())
       .post(`/api/v1/work-orders/${notReadyOrderId}/deliver`)
       .set('Authorization', receptionistAuthorization)
@@ -415,11 +415,11 @@ describe('WorkOrdersController (e2e) — US-20 settlement / deliver', () => {
       .send({ paymentMethod: 'CASH', receiptNumber: 'F2026-E2E-DISC-001' })
       .expect(200);
 
-    expect(deliverResponse.body.status).toBe('ENTREGADO');
+    expect(deliverResponse.body.status).toBe('DELIVERED');
     expect(new Prisma.Decimal(deliverResponse.body.totalCharged).equals(new Prisma.Decimal('920.00'))).toBe(true);
   });
 
-  it('WORKSHOP_LEAD can view settlement of a LISTO_ENTREGA order (RN-15)', async () => {
+  it('WORKSHOP_LEAD can view settlement of a READY_FOR_DELIVERY order (RN-15)', async () => {
     await request(app.getHttpServer())
       .get(`/api/v1/work-orders/${notReadyOrderId}/settlement`)
       .set('Authorization', workshopLeadAuthorization)

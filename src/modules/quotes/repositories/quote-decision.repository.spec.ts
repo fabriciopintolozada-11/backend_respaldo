@@ -7,7 +7,7 @@ describe('QuoteRepository quote decisions', () => {
     const tx = {
       quote: { findUnique: jest.fn().mockResolvedValue({
         id: 'quote-1',
-        workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: 'mechanic-1', status: 'PRESUPUESTO_ENVIADO' },
+        workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: 'mechanic-1', status: 'QUOTE_SENT' },
         parts: [{ id: 'quote-part-1', sparePartId: 'part-1', quantity: 2, status: 'PROPOSED' }],
         approvals: [],
       }) },
@@ -31,7 +31,7 @@ describe('QuoteRepository quote decisions', () => {
       data: { availableStock: { decrement: 2 }, reservedStock: { increment: 2 } },
     });
     expect(tx.quotePart.update).toHaveBeenCalledWith({ where: { id: 'quote-part-1' }, data: { status: 'RESERVED' } });
-    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { status: 'APROBADO' } });
+    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { status: 'APPROVED' } });
     expect(tx.notification.create).toHaveBeenCalledWith({
       data: { recipientId: 'mechanic-1', workOrderId: 'order-1', type: 'WORK_ORDER_APPROVED', message: 'Work order order-1 is approved and ready to start' },
     });
@@ -42,7 +42,7 @@ describe('QuoteRepository quote decisions', () => {
     const tx = {
       quote: { findUnique: jest.fn().mockResolvedValue({
         id: 'quote-1',
-        workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: null, status: 'PRESUPUESTO_ENVIADO' },
+        workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: null, status: 'QUOTE_SENT' },
         parts: [{ id: 'quote-part-1', status: 'PROPOSED' }],
         approvals: [],
       }) },

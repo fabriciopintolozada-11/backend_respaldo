@@ -52,7 +52,7 @@ export class MechanicOrdersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // The Quote model has no status column: an order's quote is approved when its
-  // latest QuoteApproval has decision 'APPROVED' (work order APROBADO).
+  // latest QuoteApproval has decision 'APPROVED' (work order APPROVED).
   findAssignedToMechanic(mechanicId: string, page: number, pageSize: number): Promise<AssignedWorkOrderRow[]> {
     return this.prisma.workOrder.findMany({
       where: { mechanicId },

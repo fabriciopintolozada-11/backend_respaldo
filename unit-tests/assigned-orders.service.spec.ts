@@ -13,7 +13,7 @@ describe('AssignedOrdersService (US-03)', () => {
   const assignedRow = {
     id: 'wo-1',
     vehicleId: 'v-1',
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     initialComplaint: 'No arranca',
     assignedAt: new Date('2026-08-02T10:00:00Z'),
     vehicle: { plate: '1234ABC' },

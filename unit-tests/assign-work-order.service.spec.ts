@@ -11,7 +11,7 @@ describe('AssignWorkOrderService (HU-04, RN-14)', () => {
   });
 
   it('assigns an order using the mechanic UUID from the DTO', async () => {
-    const response = { id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASIGNADA', updatedAt: new Date() };
+    const response = { id: 'work-order-1', mechanicId: 'mechanic-1', status: 'ASSIGNED', updatedAt: new Date() };
     repository.assign.mockResolvedValue(response);
 
     await expect(service.assign('work-order-1', { mechanicId: 'mechanic-1' })).resolves.toBe(response);

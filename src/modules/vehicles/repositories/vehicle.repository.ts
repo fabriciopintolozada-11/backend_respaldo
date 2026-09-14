@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 // BE-T05.3: only these terminal states count as a previous delivered visit.
-// FINALIZADO is the legacy closed state; ENTREGADO is the delivered state.
-const DELIVERED_WORK_ORDER_STATUSES: string[] = ['ENTREGADO', 'FINALIZADO'];
+// FINALIZED is the legacy closed state; DELIVERED is the delivered state.
+const DELIVERED_WORK_ORDER_STATUSES: string[] = [WorkOrderStatus.DELIVERED, WorkOrderStatus.FINALIZED];
 
 export interface VehicleHistoryRow {
   id: string;

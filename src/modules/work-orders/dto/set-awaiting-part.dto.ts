@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsString, IsUUID, Min, Matches } from 'class-validator';
 
 // US-13: payload to register a missing spare part and set the work order to
-// EN_ESPERA_DE_REPUESTO. The frontend (awaiting-part-api.ts) sends
+// WAITING_FOR_PART. The frontend (awaiting-part-api.ts) sends
 // missingPartId, quantity and reason — all three fields are required.
 export class SetAwaitingPartDto {
   @ApiProperty({ description: 'UUID of the spare part that is physically unavailable', format: 'uuid' })

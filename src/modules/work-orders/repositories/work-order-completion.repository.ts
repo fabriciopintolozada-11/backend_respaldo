@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CompleteWorkOrderDto } from '../dto/complete-work-order.dto';
 import { CompleteWorkOrderResponseDto } from '../dto/complete-work-order.response.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class WorkOrderCompletionRepository {
@@ -23,7 +24,7 @@ export class WorkOrderCompletionRepository {
   }
 
   // US-19 / BE-16 / RN-05 / RN-14 / RN-19: atomically conclude a repair. Sets
-  // the work order to LISTO_ENTREGA, frees its physical bay, persists the
+  // the work order to READY_FOR_DELIVERY, frees its physical bay, persists the
   // immutable technical history entry and notifies reception (single
   // Prisma transaction, BE-16).
   completeWorkOrder(
@@ -53,7 +54,7 @@ export class WorkOrderCompletionRepository {
       const completedAt = new Date();
       await transaction.workOrder.update({
         where: { id: workOrderId },
-        data: { status: 'LISTO_ENTREGA' },
+        data: { status: WorkOrderStatus.READY_FOR_DELIVERY },
       });
 
       // RN-19: permanent, immutable technical history entry with the user who
@@ -81,7 +82,7 @@ export class WorkOrderCompletionRepository {
 
       return {
         id: workOrderId,
-        status: 'LISTO_ENTREGA',
+        status: WorkOrderStatus.READY_FOR_DELIVERY,
         completedAt,
         bayNumber: bay?.bayNumber ?? null,
         finalMileage: dto.finalMileage ?? null,

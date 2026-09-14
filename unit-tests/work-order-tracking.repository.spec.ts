@@ -11,7 +11,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
 
   const orderRow = {
     id: 'wo-1',
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     createdAt: new Date('2026-09-01T00:00:00Z'),
     vehicle: { plate: '4589-KXA', model: 'Hilux' },
     customer: { phone: '710000000' },
@@ -31,13 +31,13 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     prisma.workOrder.findMany.mockResolvedValue([]);
     prisma.user.findMany.mockResolvedValue([]);
 
-    await repo.findTrackingSummary({ licensePlate: '4589-KXA', status: 'EN_REPARACION', workBayId: 'bay-1' });
+    await repo.findTrackingSummary({ licensePlate: '4589-KXA', status: 'IN_REPAIR', workBayId: 'bay-1' });
 
     expect(prisma.workOrder.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           vehicle: { is: { plate: '4589-KXA' } },
-          status: 'EN_REPARACION',
+          status: 'IN_REPAIR',
           currentBay: { is: { id: 'bay-1' } },
         },
       }),
@@ -64,7 +64,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
       expect.objectContaining({
         where: {
           vehicle: { is: { plate: '4589-KXA' } },
-          status: 'PRESUPUESTO_ENVIADO',
+          status: 'QUOTE_SENT',
           quote: { is: { createdAt: { lte: cutoff } } },
         },
       }),
@@ -83,7 +83,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     });
     expect(result[0]).toEqual({
       id: 'wo-1',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       createdAt: orderRow.createdAt,
       plate: '4589-KXA',
       model: 'Hilux',
@@ -101,7 +101,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     prisma.workOrder.findMany.mockResolvedValue([
       {
         ...orderRow,
-        status: 'EN_ESPERA_DE_REPUESTO',
+        status: 'WAITING_FOR_PART',
         quote: { createdAt: new Date() },
         inventoryDiscrepancies: [
           { reason: 'Out of stock', sparePart: { name: 'Pastillas de Freno Brembo' } },
@@ -151,7 +151,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     expect(prisma.workOrder.count).toHaveBeenCalledWith({
       where: {
         vehicle: { is: { plate: '4589-KXA' } },
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         quote: { is: { createdAt: { lte: cutoff } } },
       },
     });
@@ -174,7 +174,7 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     prisma.workOrder.findMany.mockResolvedValue([
       {
         ...orderRow,
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         quote: { createdAt: new Date('2026-09-03T00:00:00Z') },
         additionalFindings: [
           { description: 'Fuga de aceite detectada en el motor' },
@@ -223,7 +223,7 @@ describe('VehicleRepository.findVehicleHistory (US-05 / BE-T05.3)', () => {
         where: { plate: '4589-KXA' },
         select: expect.objectContaining({
           workOrders: expect.objectContaining({
-            where: { status: { in: ['ENTREGADO', 'FINALIZADO'] } },
+            where: { status: { in: ['DELIVERED', 'FINALIZED'] } },
           }),
         }),
       }),

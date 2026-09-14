@@ -33,10 +33,10 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
     service = new QuotesService(repository as unknown as QuoteRepository, configService as unknown as ConfigService);
   });
 
-  // Escenario a) Cálculo exitoso y transición a PRESUPUESTO_ENVIADO.
+  // Escenario a) Cálculo exitoso y transición a QUOTE_SENT.
   describe('successful quote generation (HU-12)', () => {
-    it('creates the quote and returns totals in BOB when the order is EN_DIAGNOSTICO', async () => {
-      repository.findOrderForQuote.mockResolvedValue({ status: 'EN_DIAGNOSTICO' });
+    it('creates the quote and returns totals in BOB when the order is IN_DIAGNOSIS', async () => {
+      repository.findOrderForQuote.mockResolvedValue({ status: 'IN_DIAGNOSIS' });
       repository.create.mockResolvedValue(pendingQuote);
 
       const dto = {
@@ -59,7 +59,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
 
   // Escenario b) Rechazo por estado inválido de la OT (máquina de estados).
   describe('rejection on invalid work order state (HU-12)', () => {
-    it.each(['FINALIZADO', 'RECIBIDO', 'APROBADO', 'EN_REPARACION'] as const)(
+    it.each(['FINALIZED', 'RECEIVED', 'APPROVED', 'IN_REPAIR'] as const)(
       'throws ConflictException when the order is in %s',
       async (status) => {
         repository.findOrderForQuote.mockResolvedValue({ status });
@@ -71,7 +71,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
       },
     );
 
-    it.each(['PRESUPUESTO_ENVIADO', 'RECHAZADO'] as const)(
+    it.each(['QUOTE_SENT', 'REJECTED'] as const)(
       're-emits the quote (append-only) when the order is in %s (HU-21 / BE-E06)',
       async (status) => {
         repository.findOrderForQuote.mockResolvedValue({ status });
@@ -103,7 +103,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
       ['negative part quantity', { quantity: -1, unitPrice: 20, sparePartId: 'part-1' }],
       ['negative part price', { quantity: 1, unitPrice: -20, sparePartId: 'part-1' }],
     ] as const)('rejects %s with UnprocessableEntityException', async (_name, overrides) => {
-      repository.findOrderForQuote.mockResolvedValue({ status: 'EN_DIAGNOSTICO' });
+      repository.findOrderForQuote.mockResolvedValue({ status: 'IN_DIAGNOSIS' });
       const dto = { items: [{ description: 'x', itemType: QuoteItemType.LABOR, ...overrides }] };
 
       await expect(service.create('order-1', dto)).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -120,7 +120,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
   });
 
   it('keeps decimal precision through Prisma.Decimal for non-integer inputs (RN-21)', async () => {
-    repository.findOrderForQuote.mockResolvedValue({ status: 'EN_DIAGNOSTICO' });
+    repository.findOrderForQuote.mockResolvedValue({ status: 'IN_DIAGNOSIS' });
     repository.create.mockResolvedValue({
       ...pendingQuote,
       items: [
@@ -144,7 +144,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
 describe('QuotesService quote decisions (HU-09)', () => {
   it('approves only a quote awaiting customer decision', async () => {
     const decisionRepository = {
-      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'PRESUPUESTO_ENVIADO' } }),
+      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'QUOTE_SENT' } }),
       approve: jest.fn().mockResolvedValue({ decision: 'APPROVED' }),
     };
     const decisionConfig = { get: jest.fn(() => '65') };
@@ -157,7 +157,7 @@ describe('QuotesService quote decisions (HU-09)', () => {
 
   it('rejects a decision when the quote is not awaiting approval', async () => {
     const decisionRepository = {
-      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'APROBADO' } }),
+      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'APPROVED' } }),
       reject: jest.fn(),
     };
     const decisionConfig = { get: jest.fn(() => '65') };

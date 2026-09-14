@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 // US-18: rows returned by the monitoring query. Includes the active work
 // order with its vehicle and mechanic so the dashboard can render plate,
@@ -30,7 +31,7 @@ export interface AssignedWorkBayRow {
 }
 
 // Terminal / closed states that must never be assigned to a physical bay (US-18).
-const NOT_ASSIGNABLE_STATUSES = ['ENTREGADO', 'FINALIZADO', 'LISTO_ENTREGA', 'RECHAZADO'];
+const NOT_ASSIGNABLE_STATUSES = [WorkOrderStatus.DELIVERED, WorkOrderStatus.FINALIZED, WorkOrderStatus.READY_FOR_DELIVERY, WorkOrderStatus.REJECTED];
 
 // US-18 (BE-08, BE-09, BE-16): data-access layer for the 4 physical workshop
 // bays. Business-state checks run inside the transaction to stay atomic.
@@ -105,7 +106,7 @@ export class WorkBayRepository {
       const workOrder = await tx.workOrder.findUnique({ where: { id: workOrderId } });
       if (!workOrder) throw new NotFoundException('Work order not found');
 
-      if (NOT_ASSIGNABLE_STATUSES.includes(workOrder.status)) {
+      if (NOT_ASSIGNABLE_STATUSES.includes(workOrder.status as WorkOrderStatus)) {
         throw new Error(
           `Work order in status "${workOrder.status}" cannot be assigned to a bay`,
         );

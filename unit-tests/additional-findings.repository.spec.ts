@@ -84,7 +84,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('reserves the suggested parts, extends the quote and marks the annex APPROVED', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       mechanicId: 'mechanic-id',
       quote: buildQuote(),
@@ -137,7 +137,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
     expect(quoteUpdate.data.partsSubtotal.toString()).toBe('1015');
     expect(quoteUpdate.data.total.toString()).toBe('1307.5');
     // The order resumes repair and the annex is approved with the channel.
-    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: workOrderId }, data: { status: 'EN_REPARACION' } });
+    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: workOrderId }, data: { status: 'IN_REPAIR' } });
     expect(tx.additionalFinding.update).toHaveBeenCalledWith({
       where: { id: findingId },
       data: expect.objectContaining({ status: 'APPROVED', decidedBy: userId, channel: dto.channel }),
@@ -152,7 +152,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('throws 422 when a suggested part has insufficient available stock (RN-07)', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       quote: buildQuote(),
       additionalFindings: [buildPendingFinding()],
@@ -171,7 +171,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('returns 404 when a suggested spare part is unknown or inactive', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       quote: buildQuote(),
       additionalFindings: [buildPendingFinding()],
@@ -186,7 +186,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('guards against a concurrent or non-awaiting order (BE-16)', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       vehicleId: 'vehicle-1',
       quote: buildQuote(),
       additionalFindings: [],
@@ -200,7 +200,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('guards against a missing pending annex', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       quote: buildQuote(),
       additionalFindings: [],
@@ -214,7 +214,7 @@ describe('WorkOrderRepository.approveAdditionalFinding (US-21 / BE-T21.2)', () =
   it('exposes no financial field in the allowlist response (RN-16)', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       mechanicId: null,
       quote: buildQuote(),
@@ -267,7 +267,7 @@ describe('WorkOrderRepository.rejectAdditionalFinding (US-21 / BE-T21.2, RN-19)'
     };
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       mechanicId: 'mechanic-id',
       additionalFindings: [buildPendingFinding()],
@@ -283,7 +283,7 @@ describe('WorkOrderRepository.rejectAdditionalFinding (US-21 / BE-T21.2, RN-19)'
       where: { id: findingId },
       data: { status: 'REJECTED', decidedBy: userId, decidedAt: expect.any(Date), rejectionReason: rejectDto.reason },
     });
-    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: workOrderId }, data: { status: 'EN_REPARACION' } });
+    expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: workOrderId }, data: { status: 'IN_REPAIR' } });
     expect(tx.technicalHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -301,7 +301,7 @@ describe('WorkOrderRepository.rejectAdditionalFinding (US-21 / BE-T21.2, RN-19)'
   it('guards against a non-awaiting order', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'LISTO_ENTREGA',
+      status: 'READY_FOR_DELIVERY',
       vehicleId: 'vehicle-1',
       additionalFindings: [],
     });
@@ -312,7 +312,7 @@ describe('WorkOrderRepository.rejectAdditionalFinding (US-21 / BE-T21.2, RN-19)'
   it('returns 404 when there is no pending annex', async () => {
     tx.workOrder.findUnique.mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       vehicleId: 'vehicle-1',
       additionalFindings: [],
     });

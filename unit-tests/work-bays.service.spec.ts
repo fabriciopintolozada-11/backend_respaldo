@@ -25,7 +25,7 @@ describe('WorkBaysService (US-18)', () => {
           id: 'bay-1', bayNumber: 1, isOccupied: true, currentWorkOrderId: 'wo-1',
           createdAt: new Date(), updatedAt: assignedAt, mechanicName: null,
           currentWorkOrder: {
-            id: 'wo-1', status: 'EN_ESPERA_DE_REPUESTO', assignedAt,
+            id: 'wo-1', status: 'WAITING_FOR_PART', assignedAt,
             vehicle: { plate: '4589-KXA', brand: 'Toyota', model: 'Hilux' },
             mechanic: { id: 'mech-1' },
           },
@@ -34,7 +34,7 @@ describe('WorkBaysService (US-18)', () => {
           id: 'bay-2', bayNumber: 2, isOccupied: true, currentWorkOrderId: 'wo-2',
           createdAt: new Date(), updatedAt: new Date(), mechanicName: 'Mecánico Uno',
           currentWorkOrder: {
-            id: 'wo-2', status: 'EN_REPARACION', assignedAt,
+            id: 'wo-2', status: 'IN_REPAIR', assignedAt,
             vehicle: { plate: '3210-BCD', brand: 'Mazda', model: 'CX-5' },
             mechanic: { id: 'mech-1' },
           },
@@ -49,9 +49,9 @@ describe('WorkBaysService (US-18)', () => {
       const result = await service.getMonitoring();
 
       expect(result).toHaveLength(3);
-      expect(result[0]).toMatchObject({ bayNumber: 1, status: 'ESPERA_REPUESTO', isOccupied: true });
-      expect(result[1]).toMatchObject({ bayNumber: 2, status: 'OCUPADA' });
-      expect(result[2]).toMatchObject({ bayNumber: 3, status: 'LIBRE' });
+      expect(result[0]).toMatchObject({ bayNumber: 1, status: 'WAITING_FOR_PART', isOccupied: true });
+      expect(result[1]).toMatchObject({ bayNumber: 2, status: 'OCCUPIED' });
+      expect(result[2]).toMatchObject({ bayNumber: 3, status: 'FREE' });
       expect(result[0].currentWorkOrder?.elapsedHours).toBe(2.5);
       expect(repository.findAllByNumber).toHaveBeenCalledTimes(1);
     });
@@ -87,7 +87,7 @@ describe('WorkBaysService (US-18)', () => {
     });
 
     it('maps repository state rule failures to 422', async () => {
-      repository.assignWorkOrder.mockRejectedValue(new Error('Work order in status "ENTREGADO" cannot be assigned to a bay'));
+      repository.assignWorkOrder.mockRejectedValue(new Error('Work order in status "DELIVERED" cannot be assigned to a bay'));
       await expect(service.assign('bay-1', { workOrderId: 'wo-1' })).rejects.toBeInstanceOf(UnprocessableEntityException);
     });
   });

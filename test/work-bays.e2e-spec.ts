@@ -58,16 +58,16 @@ describe('WorkBaysController (e2e) — US-18', () => {
     vehicleId = vehicle.id;
 
     const activeOrder = await prisma.workOrder.create({
-      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e activa', status: 'APROBADO', createdAt: new Date() },
+      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e activa', status: 'APPROVED', createdAt: new Date() },
     });
     const secondOrder = await prisma.workOrder.create({
-      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e segunda', status: 'EN_REPARACION', createdAt: new Date() },
+      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e segunda', status: 'IN_REPAIR', createdAt: new Date() },
     });
     const pendingOrder = await prisma.workOrder.create({
-      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e espera repuesto', status: 'EN_ESPERA_DE_REPUESTO', createdAt: new Date() },
+      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e espera repuesto', status: 'WAITING_FOR_PART', createdAt: new Date() },
     });
     const terminalOrder = await prisma.workOrder.create({
-      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e entregada', status: 'ENTREGADO', createdAt: new Date() },
+      data: { vehicleId, customerId, receptionistId: defaultReceptionistId, initialComplaint: 'Bahía e2e entregada', status: 'DELIVERED', createdAt: new Date() },
     });
     activeOrderId = activeOrder.id;
     secondOrderId = secondOrder.id;
@@ -107,12 +107,12 @@ describe('WorkBaysController (e2e) — US-18', () => {
 
     expect(response.body).toHaveLength(4);
     expect(response.body.map((b: { bayNumber: number }) => b.bayNumber)).toEqual([1, 2, 3, 4]);
-    expect(response.body[0].status).toBe('OCUPADA');
+    expect(response.body[0].status).toBe('OCCUPIED');
     expect(response.body[0].currentWorkOrder).toBeDefined();
-    expect(response.body[0].currentWorkOrder.status).toBe('APROBADO');
+    expect(response.body[0].currentWorkOrder.status).toBe('APPROVED');
     expect(typeof response.body[0].currentWorkOrder.elapsedHours).toBe('number');
-    expect(response.body[2]).toMatchObject({ bayNumber: 3, isOccupied: false, status: 'LIBRE', currentWorkOrderId: null });
-    expect(response.body[3]).toMatchObject({ bayNumber: 4, isOccupied: false, status: 'LIBRE' });
+    expect(response.body[2]).toMatchObject({ bayNumber: 3, isOccupied: false, status: 'FREE', currentWorkOrderId: null });
+    expect(response.body[3]).toMatchObject({ bayNumber: 4, isOccupied: false, status: 'FREE' });
   });
 
   it('assigns an active work order to a free bay (US-18)', async () => {
@@ -128,7 +128,7 @@ describe('WorkBaysController (e2e) — US-18', () => {
       .get('/api/v1/work-bays/monitoring')
       .set('Authorization', leadAuthorization)
       .expect(200);
-    expect(monitoring.body[2].status).toBe('OCUPADA');
+    expect(monitoring.body[2].status).toBe('OCCUPIED');
   });
 
   it('frees the previous bay when the work order is moved to another bay (US-18)', async () => {
@@ -152,7 +152,7 @@ describe('WorkBaysController (e2e) — US-18', () => {
       .expect(409);
   });
 
-  it('derives ESPERA_REPUESTO status and rejects closed work orders with 422', async () => {
+  it('derives WAITING_FOR_PART status and rejects closed work orders with 422', async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/work-bays/${bay3Id}/assign`)
       .set('Authorization', leadAuthorization)
@@ -163,7 +163,7 @@ describe('WorkBaysController (e2e) — US-18', () => {
       .get('/api/v1/work-bays/monitoring')
       .set('Authorization', leadAuthorization)
       .expect(200);
-    expect(monitoring.body[2].status).toBe('ESPERA_REPUESTO');
+    expect(monitoring.body[2].status).toBe('WAITING_FOR_PART');
 
     await request(app.getHttpServer())
       .patch(`/api/v1/work-bays/${bay4Id}/assign`)

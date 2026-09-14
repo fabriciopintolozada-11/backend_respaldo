@@ -56,7 +56,7 @@ export class WorkOrdersController {
     return this.service.getTrackingSummary(query);
   }
 
-  // HU-12: list work orders in EN_DIAGNOSTICO ready to be quoted. Declared
+  // HU-12: list work orders in IN_DIAGNOSIS ready to be quoted. Declared
   // before any ':id' route so the literal path wins.
   @Get('work-orders/pending-quote')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
@@ -96,7 +96,7 @@ export class WorkOrdersController {
 
   // US-21 (BE-T21.2 / HU-09): approve the additional quote of an unforeseen
   // finding reported during repair (RN-03). The suggested parts are reserved
-  // (RN-07) and the order resumes EN_REPARACION. Only RECEPTIONIST and
+  // (RN-07) and the order resumes IN_REPAIR. Only RECEPTIONIST and
   // WORKSHOP_LEAD may decide (BE-T21.2).
   @Post('work-orders/:id/additional-findings/approve')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
@@ -117,7 +117,7 @@ export class WorkOrdersController {
 
   // US-21 (BE-T21.2 / RN-19): reject the additional quote. The finding is
   // archived permanently as "Daño no reparado por decisión del cliente" and
-  // the order resumes EN_REPARACION to finish only the originally approved
+  // the order resumes IN_REPAIR to finish only the originally approved
   // work. Only RECEPTIONIST and WORKSHOP_LEAD may decide (BE-T21.2).
   @Post('work-orders/:id/additional-findings/reject')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD)
@@ -161,7 +161,7 @@ export class WorkOrdersController {
   @ApiResponse({ status: 200, type: WorkOrderPartResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
   @ApiResponse({ status: 404, description: 'Work order or spare part not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status' })
+  @ApiResponse({ status: 409, description: 'Work order is not in IN_REPAIR status' })
   @ApiResponse({ status: 422, description: 'Mechanic ownership, part association or net consumed quantity rules violated' })
   returnPart(
     @Param('id', ParseUUIDPipe) id: string,
@@ -171,7 +171,7 @@ export class WorkOrdersController {
     return this.service.returnPart(id, request.user.id, request.user.role, dto);
   }
 
-  // US-13 / RN-05: set a work order to EN_ESPERA_DE_REPUESTO when a spare
+  // US-13 / RN-05: set a work order to WAITING_FOR_PART when a spare
   // part is physically unavailable. Only the assigned mechanic or the
   // workshop lead can trigger this transition.
   @Post('work-orders/:id/awaiting-part')
@@ -181,7 +181,7 @@ export class WorkOrdersController {
   @ApiResponse({ status: 200, type: AwaitingPartResponseDto })
   @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
   @ApiResponse({ status: 404, description: 'Work order not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status (RN-05)' })
+  @ApiResponse({ status: 409, description: 'Work order is not in IN_REPAIR status (RN-05)' })
   @ApiResponse({ status: 422, description: 'Work order not assigned to this mechanic or spare part not associated' })
   setAwaitingPart(
     @Param('id', ParseUUIDPipe) id: string,
@@ -191,16 +191,16 @@ export class WorkOrdersController {
     return this.service.setAwaitingPart(id, request.user.id, request.user.role, dto);
   }
 
-  // US-19: conclude a repair, set the work order to LISTO_ENTREGA and free its
+  // US-19: conclude a repair, set the work order to READY_FOR_DELIVERY and free its
   // physical bay. Only the assigned mechanic or the workshop lead can trigger
   // this transition (BE-T19.2, RN-04, RN-05, RN-14, RN-19).
   @Post('work-orders/:id/complete')
   @Roles(UserRole.MECHANIC, UserRole.WORKSHOP_LEAD)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Conclude a repair, set the work order to LISTO_ENTREGA and release its bay (US-19, RN-05, RN-14, RN-19)' })
+  @ApiOperation({ summary: 'Conclude a repair, set the work order to READY_FOR_DELIVERY and release its bay (US-19, RN-05, RN-14, RN-19)' })
   @ApiResponse({ status: 200, type: CompleteWorkOrderResponseDto })
   @ApiResponse({ status: 404, description: 'Work order not found' })
-  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status' })
+  @ApiResponse({ status: 409, description: 'Work order is not in IN_REPAIR status' })
   @ApiResponse({ status: 422, description: 'RN-04: not assigned to this mechanic, or RN-05: awaiting spare parts' })
   complete(
     @Param('id', ParseUUIDPipe) id: string,

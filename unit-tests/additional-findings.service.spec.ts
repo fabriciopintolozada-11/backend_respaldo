@@ -31,7 +31,7 @@ describe('WorkOrdersService.approveAdditionalFinding (US-21 / BE-T21.2)', () => 
   it('approves the annex using the official configured hourly rate (BE-12.5)', async () => {
     const context = {
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       additionalFindings: [{ id: 'finding-1', description: 'Fuga de aceite' }],
     };
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue(context);
@@ -58,7 +58,7 @@ describe('WorkOrdersService.approveAdditionalFinding (US-21 / BE-T21.2)', () => 
   it('falls back to the official 65 BOB/h rate when no environment value is set', async () => {
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       additionalFindings: [{ id: 'finding-1', description: 'Fuga de aceite' }],
     });
     repository.approveAdditionalFinding = jest.fn().mockResolvedValue({ status: 'APPROVED' });
@@ -79,7 +79,7 @@ describe('WorkOrdersService.approveAdditionalFinding (US-21 / BE-T21.2)', () => 
   it('rejects the approval while the order is not awaiting a budget', async () => {
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue({
       id: workOrderId,
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       additionalFindings: [],
     });
 
@@ -90,7 +90,7 @@ describe('WorkOrdersService.approveAdditionalFinding (US-21 / BE-T21.2)', () => 
   it('rejects the approval when no annex is pending a decision', async () => {
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       additionalFindings: [],
     });
 
@@ -119,7 +119,7 @@ describe('WorkOrdersService.rejectAdditionalFinding (US-21 / BE-T21.2)', () => {
   it('rejects the annex and forwards the id, dto and user to the repository', async () => {
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue({
       id: workOrderId,
-      status: 'PRESUPUESTO_ENVIADO',
+      status: 'QUOTE_SENT',
       additionalFindings: [{ id: 'finding-1', description: 'Fuga de aceite' }],
     });
     repository.rejectAdditionalFinding = jest.fn().mockResolvedValue({ id: 'finding-1', status: 'REJECTED' });
@@ -140,7 +140,7 @@ describe('WorkOrdersService.rejectAdditionalFinding (US-21 / BE-T21.2)', () => {
   it('rejects the outcome while the order is not awaiting a budget', async () => {
     repository.findAdditionalFindingContext = jest.fn().mockResolvedValue({
       id: workOrderId,
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       additionalFindings: [],
     });
 

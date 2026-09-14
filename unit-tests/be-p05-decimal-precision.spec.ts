@@ -131,7 +131,7 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
 
       tx.workOrder.findUnique.mockResolvedValue({
         id: workOrderId,
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         vehicleId: 'vehicle-1',
         mechanicId: 'mechanic-id',
         quote: {
@@ -207,7 +207,7 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
 
       tx.workOrder.findUnique.mockResolvedValue({
         id: workOrderId,
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         vehicleId: 'vehicle-1',
         mechanicId: 'mechanic-id',
         quote: {
@@ -282,7 +282,7 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
 
       tx.workOrder.findUnique.mockResolvedValue({
         id: workOrderId,
-        status: 'PRESUPUESTO_ENVIADO',
+        status: 'QUOTE_SENT',
         vehicleId: 'vehicle-1',
         mechanicId: 'mechanic-id',
         quote: {

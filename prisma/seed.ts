@@ -111,7 +111,7 @@ async function main() {
 
   // 6. Órdenes de trabajo (buscar por vehicleId + status o crear si no existen)
   const wo1 = await prisma.workOrder.findFirst({
-    where: { vehicleId: vehicles[0].id, status: 'APROBADO' },
+    where: { vehicleId: vehicles[0].id, status: 'APPROVED' },
   });
   const workOrder1 = wo1 ?? await prisma.workOrder.create({
     data: {
@@ -119,14 +119,14 @@ async function main() {
       customerId: customers[0].id,
       receptionistId,
       initialComplaint: 'Ruido extraño al frenar, pastillas desgastadas y amortiguadores con fuga',
-      status: 'APROBADO',
+      status: 'APPROVED',
       mechanicId: mechanicA,
       assignedAt: new Date('2026-09-01T08:00:00Z'),
     },
   });
 
   const wo2 = await prisma.workOrder.findFirst({
-    where: { vehicleId: vehicles[1].id, status: 'EN_REPARACION' },
+    where: { vehicleId: vehicles[1].id, status: 'IN_REPAIR' },
   });
   const workOrder2 = wo2 ?? await prisma.workOrder.create({
     data: {
@@ -134,14 +134,14 @@ async function main() {
       customerId: customers[1].id,
       receptionistId,
       initialComplaint: 'Embrague patina, cambio de Kit de embrague y aceite de transmisión',
-      status: 'EN_REPARACION',
+      status: 'IN_REPAIR',
       mechanicId: mechanicA,
       assignedAt: new Date('2026-09-02T09:00:00Z'),
     },
   });
 
   const wo3 = await prisma.workOrder.findFirst({
-    where: { vehicleId: vehicles[2].id, status: 'RECIBIDO' },
+    where: { vehicleId: vehicles[2].id, status: 'RECEIVED' },
   });
   const workOrder3 = wo3 ?? await prisma.workOrder.create({
     data: {
@@ -149,12 +149,12 @@ async function main() {
       customerId: customers[2].id,
       receptionistId,
       initialComplaint: 'Mantenimiento preventivo 50,000 km',
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
     },
   });
 
   const wo4 = await prisma.workOrder.findFirst({
-    where: { vehicleId: vehicles[3].id, status: 'ASIGNADA' },
+    where: { vehicleId: vehicles[3].id, status: 'ASSIGNED' },
   });
   const workOrder4 = wo4 ?? await prisma.workOrder.create({
     data: {
@@ -162,7 +162,7 @@ async function main() {
       customerId: customers[3].id,
       receptionistId,
       initialComplaint: 'Cambio de filtro de aceite urgente',
-      status: 'ASIGNADA',
+      status: 'ASSIGNED',
       mechanicId: mechanicB,
       assignedAt: new Date('2026-09-03T10:00:00Z'),
     },
@@ -171,7 +171,7 @@ async function main() {
   const workOrders = [workOrder1, workOrder2, workOrder3, workOrder4];
 
   // 6b. US-18: las 4 bahías físicas del taller (upsert — no borra nada).
-  //    Bahía 1 → OT en APROBADO, Bahía 2 → OT en EN_REPARACION, 3 y 4 libres.
+  //    Bahía 1 → OT en APPROVED, Bahía 2 → OT en IN_REPAIR, 3 y 4 libres.
   const bayData = [
     { bayNumber: 1, isOccupied: true, currentWorkOrderId: workOrder1.id },
     { bayNumber: 2, isOccupied: true, currentWorkOrderId: workOrder2.id },

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-// HU-12: a work order that is ready to be quoted (EN_DIAGNOSTICO). RN-16: this
+// HU-12: a work order that is ready to be quoted (IN_DIAGNOSIS). RN-16: this
 // list must never expose cost, price or rate fields to the advisor.
 export class PendingQuoteWorkOrderResponseDto {
   @ApiProperty({ description: 'Work order id' })

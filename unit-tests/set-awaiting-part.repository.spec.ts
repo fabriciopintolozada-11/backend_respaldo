@@ -41,7 +41,7 @@ describe('WorkOrderRepository - setAwaitingPart (US-13)', () => {
     it('returns context with status, mechanicId, vehicleId and quote parts', async () => {
       const mockContext = {
         id: WORK_ORDER_ID,
-        status: 'EN_REPARACION',
+        status: 'IN_REPAIR',
         mechanicId: USER_ID,
         vehicleId: VEHICLE_ID,
         quote: {
@@ -88,7 +88,7 @@ describe('WorkOrderRepository - setAwaitingPart (US-13)', () => {
       // Verify work order status was updated
       expect(mockTx.workOrder.update).toHaveBeenCalledWith({
         where: { id: WORK_ORDER_ID },
-        data: { status: 'EN_ESPERA_DE_REPUESTO' },
+        data: { status: 'WAITING_FOR_PART' },
       });
 
       // Verify immutable technical history was created (RN-19)
@@ -120,7 +120,7 @@ describe('WorkOrderRepository - setAwaitingPart (US-13)', () => {
       // Verify response shape
       expect(result).toEqual({
         id: WORK_ORDER_ID,
-        status: 'EN_ESPERA_DE_REPUESTO',
+        status: 'WAITING_FOR_PART',
         missingPartId: SPARE_PART_ID,
         quantity: 2,
         reason: 'Part not found on shelf',

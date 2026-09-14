@@ -27,7 +27,7 @@ describe('WorkOrdersService HU-04 queries', () => {
       customerName: 'Customer One',
       customerIdentification: 'ID-1',
       initialComplaint: 'Engine noise',
-      status: 'RECIBIDO',
+      status: 'RECEIVED',
       createdAt: new Date('2026-08-20T10:00:00Z'),
       mechanicId: null,
     };

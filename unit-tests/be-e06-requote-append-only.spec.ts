@@ -58,7 +58,7 @@ describe('BE-E06 append-only re-quote (HU-21)', () => {
     ]);
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
-      data: { status: 'PRESUPUESTO_ENVIADO' },
+      data: { status: 'QUOTE_SENT' },
     });
   });
 
@@ -109,7 +109,7 @@ describe('BE-E06 append-only re-quote (HU-21)', () => {
     expect(tx.quote.update).toHaveBeenCalled();
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
-      data: { status: 'PRESUPUESTO_ENVIADO' },
+      data: { status: 'QUOTE_SENT' },
     });
   });
 
@@ -118,7 +118,7 @@ describe('BE-E06 append-only re-quote (HU-21)', () => {
       quote: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'quote-1',
-          workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: 'mechanic-1', status: 'PRESUPUESTO_ENVIADO' },
+          workOrder: { id: 'order-1', vehicleId: 'vehicle-1', mechanicId: 'mechanic-1', status: 'QUOTE_SENT' },
           parts: [],
           approvals: [],
         }),

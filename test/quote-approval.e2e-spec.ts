@@ -53,7 +53,7 @@ describe('Quote approval endpoints (e2e) — US-09', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    repository.findDecisionContext.mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'PRESUPUESTO_ENVIADO' } });
+    repository.findDecisionContext.mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'QUOTE_SENT' } });
     repository.approve.mockResolvedValue({ decision: 'APPROVED', quoteId: 'quote-1', workOrderId: 'order-1' });
     repository.reject.mockResolvedValue({ decision: 'REJECTED', quoteId: 'quote-1', workOrderId: 'order-1' });
   });

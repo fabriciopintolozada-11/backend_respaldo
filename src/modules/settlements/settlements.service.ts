@@ -7,21 +7,22 @@ import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
 import { SettlementAdjustmentResponseDto, AdjustmentType } from './dto/settlement-adjustment.response.dto';
 import { Prisma } from '../../generated/prisma/client';
+import { WorkOrderStatus } from '../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class SettlementsService {
   constructor(private readonly repository: SettlementRepository) {}
 
   // US-20: build the consolidated settlement (RN-21) for an order that is
-  // ready to be delivered. Only LISTO_ENTREGA is settled; every monetary
+  // ready to be delivered. Only READY_FOR_DELIVERY is settled; every monetary
   // value is serialized as a string (BE-13).
   async getSettlement(workOrderId: string): Promise<WorkOrderSettlementResponseDto> {
     const context = await this.repository.findSettlementContext(workOrderId);
     if (!context) throw new NotFoundException('Work order not found');
 
-    // RN-05 (E4): only LISTO_ENTREGA orders can be settled.
-    if (context.status !== 'LISTO_ENTREGA') {
-      throw new ConflictException('Work order must be in LISTO_ENTREGA to settle');
+    // RN-05 (E4): only READY_FOR_DELIVERY orders can be settled.
+    if (context.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+      throw new ConflictException('Work order must be in READY_FOR_DELIVERY to settle');
     }
 
     // RN-21: total = approved labor subtotal + installed parts subtotal.
@@ -89,9 +90,9 @@ export class SettlementsService {
     const context = await this.repository.findSettlementContext(workOrderId);
     if (!context) throw new NotFoundException('Work order not found');
 
-    // RN-05 (E4): only LISTO_ENTREGA orders can be delivered.
-    if (context.status !== 'LISTO_ENTREGA') {
-      throw new ConflictException('Work order must be in LISTO_ENTREGA to be delivered');
+    // RN-05 (E4): only READY_FOR_DELIVERY orders can be delivered.
+    if (context.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+      throw new ConflictException('Work order must be in READY_FOR_DELIVERY to be delivered');
     }
 
     // RN-21: an order already handed over cannot be settled again.
@@ -113,8 +114,8 @@ export class SettlementsService {
     const context = await this.repository.findSettlementContext(workOrderId);
     if (!context) throw new NotFoundException('Work order not found');
 
-    if (context.status !== 'LISTO_ENTREGA') {
-      throw new ConflictException('Work order must be in LISTO_ENTREGA to apply discounts');
+    if (context.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+      throw new ConflictException('Work order must be in READY_FOR_DELIVERY to apply discounts');
     }
     if (context.deliveredAt) {
       throw new ConflictException('Work order has already been delivered');
@@ -132,8 +133,8 @@ export class SettlementsService {
     const context = await this.repository.findSettlementContext(workOrderId);
     if (!context) throw new NotFoundException('Work order not found');
 
-    if (context.status !== 'LISTO_ENTREGA') {
-      throw new ConflictException('Work order must be in LISTO_ENTREGA to void adjustments');
+    if (context.status !== WorkOrderStatus.READY_FOR_DELIVERY) {
+      throw new ConflictException('Work order must be in READY_FOR_DELIVERY to void adjustments');
     }
     if (context.deliveredAt) {
       throw new ConflictException('Work order has already been delivered');

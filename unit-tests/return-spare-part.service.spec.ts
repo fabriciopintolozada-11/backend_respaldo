@@ -13,7 +13,7 @@ describe('WorkOrdersService.returnPart (HU-07 / BE-E03 - Devolución física de 
 
   const baseContext = {
     id: 'wo-1',
-    status: 'EN_REPARACION',
+    status: 'IN_REPAIR',
     mechanicId: 'mech-1',
     vehicleId: 'veh-1',
     quote: {
@@ -56,8 +56,8 @@ describe('WorkOrdersService.returnPart (HU-07 / BE-E03 - Devolución física de 
       expect(repository.returnPart).toHaveBeenCalledWith('wo-1', dto, 'lead-1');
     });
 
-    it('allows returning while the order is EN_ESPERA_DE_REPUESTO (waiting part pause)', async () => {
-      repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status: 'EN_ESPERA_DE_REPUESTO' });
+    it('allows returning while the order is WAITING_FOR_PART (waiting part pause)', async () => {
+      repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status: 'WAITING_FOR_PART' });
       repository.returnPart = jest.fn().mockResolvedValue({ id: 'qp-1', code: 'FIL-01', name: 'Filtro', quantity: 1, status: 'INSTALLED' });
 
       await service.returnPart('wo-1', 'mech-1', UserRole.MECHANIC, dto);
@@ -87,7 +87,7 @@ describe('WorkOrdersService.returnPart (HU-07 / BE-E03 - Devolución física de 
   });
 
   describe('BE-E03: work order state machine', () => {
-    it.each(['RECIBIDO', 'EN_DIAGNOSTICO', 'PRESUPUESTO_ENVIADO', 'APROBADO', 'LISTO_ENTREGA', 'ENTREGADO', 'FINALIZADO', 'RECHAZADO'])(
+    it.each(['RECEIVED', 'IN_DIAGNOSIS', 'QUOTE_SENT', 'APPROVED', 'READY_FOR_DELIVERY', 'DELIVERED', 'FINALIZED', 'REJECTED'])(
       'rejects the return when the order is in state %s',
       async (status) => {
         repository.findConsumeContext = jest.fn().mockResolvedValue({ ...baseContext, status });

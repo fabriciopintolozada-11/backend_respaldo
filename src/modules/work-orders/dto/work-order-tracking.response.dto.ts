@@ -19,7 +19,7 @@ export class WorkOrderTrackingResponseDto {
   @ApiProperty({ nullable: true }) pausedReason!: string | null;
   @ApiProperty({ nullable: true }) daysWaitingApproval!: number | null;
   // BE-T16.2 (US-16 / RN-06): true when the work order stayed in
-  // PRESUPUESTO_ENVIADO for 15+ days without an approval or rejection.
+  // QUOTE_SENT for 15+ days without an approval or rejection.
   @ApiProperty({
     default: false,
     description: 'RN-06: the order has been awaiting quote approval for 15+ days',

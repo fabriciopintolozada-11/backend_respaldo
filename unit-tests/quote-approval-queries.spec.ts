@@ -17,11 +17,11 @@ describe('QuotesService approval queries', () => {
   });
 
   it('returns a paginated approval list', async () => {
-    repository.findApprovalPage.mockResolvedValue([{ workOrderId: 'order-1', orderCode: null, vehiclePlate: 'ABC-123', vehicleBrand: 'Toyota', vehicleModel: 'Yaris', vehicleYear: 2024, clientName: 'Client', total: '100.00', status: 'PRESUPUESTO_ENVIADO', isFullyElectric: false }]);
+    repository.findApprovalPage.mockResolvedValue([{ workOrderId: 'order-1', orderCode: null, vehiclePlate: 'ABC-123', vehicleBrand: 'Toyota', vehicleModel: 'Yaris', vehicleYear: 2024, clientName: 'Client', total: '100.00', status: 'QUOTE_SENT', isFullyElectric: false }]);
     repository.countApprovalQuotes.mockResolvedValue(1);
 
     await expect(service.listApprovalQuotes({ page: 2, pageSize: 10 })).resolves.toEqual({
-      data: [{ orderId: 'order-1', orderCode: null, vehiclePlate: 'ABC-123', vehicleDescription: 'Toyota Yaris (2024)', clientName: 'Client', totalBOB: '100.00', status: 'PRESUPUESTO_ENVIADO', isFullyElectric: false }],
+      data: [{ orderId: 'order-1', orderCode: null, vehiclePlate: 'ABC-123', vehicleDescription: 'Toyota Yaris (2024)', clientName: 'Client', totalBOB: '100.00', status: 'QUOTE_SENT', isFullyElectric: false }],
       total: 1,
       page: 2,
       pageSize: 10,

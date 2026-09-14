@@ -24,7 +24,7 @@ describe('VehiclesService.getVehicleHistory (US-05 / BE-T05.3)', () => {
     workOrders: [
       {
         id: 'wo-1',
-        status: 'ENTREGADO',
+        status: 'DELIVERED',
         createdAt: new Date('2026-07-10T08:00:00Z'),
         diagnostic: {
           id: 'd-1',

@@ -21,7 +21,7 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
 
   const baseContext = {
     id: WORK_ORDER_ID,
-    status: 'LISTO_ENTREGA',
+    status: 'READY_FOR_DELIVERY',
     deliveredAt: null,
     vehicleId: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     vehicle: { plate: '2345-XYZ', brand: 'Toyota', model: 'Corolla', year: 2019 },
@@ -77,13 +77,13 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       await expect(service.getSettlement(WORK_ORDER_ID)).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects a work order not in LISTO_ENTREGA with 409 (RN-05)', async () => {
-      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'EN_REPARACION' });
+    it('rejects a work order not in READY_FOR_DELIVERY with 409 (RN-05)', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'IN_REPAIR' });
       await expect(service.getSettlement(WORK_ORDER_ID)).rejects.toThrow(ConflictException);
     });
 
-    it('rejects an already delivered work order (ENTREGADO) with 409', async () => {
-      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'ENTREGADO', deliveredAt: new Date() });
+    it('rejects an already delivered work order (DELIVERED) with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'DELIVERED', deliveredAt: new Date() });
       await expect(service.getSettlement(WORK_ORDER_ID)).rejects.toThrow(ConflictException);
     });
 
@@ -155,8 +155,8 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       await expect(service.deliver(WORK_ORDER_ID, USER_ID, DTO)).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects a work order not in LISTO_ENTREGA with 409 (RN-05)', async () => {
-      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'APROBADO' });
+    it('rejects a work order not in READY_FOR_DELIVERY with 409 (RN-05)', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'APPROVED' });
       await expect(service.deliver(WORK_ORDER_ID, USER_ID, DTO)).rejects.toThrow(ConflictException);
     });
 
@@ -169,7 +169,7 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       repository.findSettlementContext.mockResolvedValue(baseContext);
       repository.deliverWorkOrder.mockResolvedValue({
         id: WORK_ORDER_ID,
-        status: 'ENTREGADO',
+        status: 'DELIVERED',
         deliveredAt: new Date(),
         paymentMethod: PaymentMethod.CASH,
         receiptNumber: DTO.receiptNumber,
@@ -180,7 +180,7 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       const result = await service.deliver(WORK_ORDER_ID, USER_ID, DTO);
 
       expect(repository.deliverWorkOrder).toHaveBeenCalledWith(WORK_ORDER_ID, USER_ID, DTO);
-      expect(result.status).toBe('ENTREGADO');
+      expect(result.status).toBe('DELIVERED');
       expect(result.totalCharged).toBe('950.00');
     });
 
@@ -194,7 +194,7 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       repository.findSettlementContext.mockResolvedValue(contextWithDiscounts);
       repository.deliverWorkOrder.mockResolvedValue({
         id: WORK_ORDER_ID,
-        status: 'ENTREGADO',
+        status: 'DELIVERED',
         deliveredAt: new Date(),
         paymentMethod: PaymentMethod.CASH,
         receiptNumber: DTO.receiptNumber,
@@ -216,8 +216,8 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       await expect(service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO)).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects a work order not in LISTO_ENTREGA with 409', async () => {
-      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'EN_REPARACION' });
+    it('rejects a work order not in READY_FOR_DELIVERY with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'IN_REPAIR' });
       await expect(service.applyDiscount(WORK_ORDER_ID, USER_ID, DISCOUNT_DTO)).rejects.toThrow(ConflictException);
     });
 
@@ -254,8 +254,8 @@ describe('SettlementsService - getSettlement / deliver (US-20)', () => {
       await expect(service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO)).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects a work order not in LISTO_ENTREGA with 409', async () => {
-      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'APROBADO' });
+    it('rejects a work order not in READY_FOR_DELIVERY with 409', async () => {
+      repository.findSettlementContext.mockResolvedValue({ ...baseContext, status: 'APPROVED' });
       await expect(service.voidAdjustment(WORK_ORDER_ID, USER_ID, VOID_DTO)).rejects.toThrow(ConflictException);
     });
 

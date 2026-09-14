@@ -6,6 +6,7 @@ import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 import { UserRole } from '../../../common/enums/user-role.enum';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 @Injectable()
 export class PartReservationService {
@@ -31,7 +32,7 @@ export class PartReservationService {
 
     // RN-09: the order must be approved or in repair. Receiving/diagnostic
     // stages cannot start a repair or consume stock.
-    if (!['APROBADO', 'EN_REPARACION'].includes(context.status)) {
+    if (![WorkOrderStatus.APPROVED, WorkOrderStatus.IN_REPAIR].includes(context.status as WorkOrderStatus)) {
       throw new UnprocessableEntityException('RN-09: work order is not approved or in repair to consume a spare part');
     }
 
@@ -45,7 +46,7 @@ export class PartReservationService {
 
     // RN-01: never consume more than the reserved quantity.
     // HU-07: the first consumption of an approved order moves it to repair.
-    const nextStatus = context.status === 'APROBADO' ? 'EN_REPARACION' : context.status;
+    const nextStatus = context.status === WorkOrderStatus.APPROVED ? WorkOrderStatus.IN_REPAIR : context.status;
 
     return this.repository.consumePart(workOrderId, dto, userId, nextStatus);
   }
@@ -70,9 +71,9 @@ export class PartReservationService {
 
     // BE-E03: a part can only be physically returned while the order is still
     // being worked on. Delivered/settled orders keep their charged parts.
-    if (!['EN_REPARACION', 'EN_ESPERA_DE_REPUESTO'].includes(context.status)) {
+    if (![WorkOrderStatus.IN_REPAIR, WorkOrderStatus.WAITING_FOR_PART].includes(context.status as WorkOrderStatus)) {
       throw new ConflictException(
-        'Work order must be in EN_REPARACION to return a spare part',
+        'Work order must be in IN_REPAIR to return a spare part',
       );
     }
 
@@ -87,7 +88,7 @@ export class PartReservationService {
     return this.repository.returnPart(workOrderId, dto, userId);
   }
 
-  // US-13: set a work order to EN_ESPERA_DE_REPUESTO when a spare part is
+  // US-13: set a work order to WAITING_FOR_PART when a spare part is
   // physically unavailable in the warehouse. All business rules live here
   // (BE-06); the repository performs the atomic persistence (BE-16).
   async setAwaitingPart(
@@ -105,11 +106,11 @@ export class PartReservationService {
       throw new UnprocessableEntityException('RN-04: work order is not assigned to this mechanic');
     }
 
-    // RN-05: the work order must be strictly in EN_REPARACION to transition
-    // to EN_ESPERA_DE_REPUESTO.
-    if (context.status !== 'EN_REPARACION') {
+    // RN-05: the work order must be strictly in IN_REPAIR to transition
+    // to WAITING_FOR_PART.
+    if (context.status !== WorkOrderStatus.IN_REPAIR) {
       throw new ConflictException(
-        'RN-05: work order must be in EN_REPARACION to set awaiting part',
+        'RN-05: work order must be in IN_REPAIR to set awaiting part',
       );
     }
 

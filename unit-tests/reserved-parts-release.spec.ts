@@ -105,7 +105,7 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
           findUnique: jest.fn().mockResolvedValue({
             id: 'wo-1',
             vehicleId: 'veh-1',
-            status: 'LISTO_ENTREGA',
+            status: 'READY_FOR_DELIVERY',
             deliveredAt: null,
             quote: {
               laborSubtotal: new Prisma.Decimal('0'),
@@ -147,7 +147,7 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
         quote: {
           findUnique: jest.fn().mockResolvedValue({
             id: 'quote-1',
-            workOrder: { id: 'order-1', vehicleId: 'vehicle-1', status: 'PRESUPUESTO_ENVIADO' },
+            workOrder: { id: 'order-1', vehicleId: 'vehicle-1', status: 'QUOTE_SENT' },
             parts: [{ id: 'quote-part-1', status: 'PROPOSED' }],
             approvals: [],
           }),
@@ -181,7 +181,7 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
       });
       // BE-E06 / HU-21: only live lines are closed as RELEASED.
       expect(tx.quotePart.updateMany).toHaveBeenCalledWith({ where: { quoteId: 'quote-1', status: { in: ['PROPOSED', 'RESERVED'] } }, data: { status: 'RELEASED' } });
-      expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { status: 'RECHAZADO' } });
+      expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { status: 'REJECTED' } });
     });
   });
 

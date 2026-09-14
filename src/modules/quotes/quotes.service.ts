@@ -8,6 +8,7 @@ import { QuoteDecisionResponseDto } from './dto/quote-decision-response.dto';
 import { ListQuoteApprovalResponseDto, QuoteApprovalDetailResponseDto } from './dto/quote-approval-query-response.dto';
 import { QueryQuoteApprovalsDto } from './dto/query-quote-approvals.dto';
 import { QuoteRepository } from './repositories/quote.repository';
+import { WorkOrderStatus } from '../../common/enums/work-order-status.enum';
 
 // BE-12.5 (HU-12): the official hourly labor rate used to price labor items is
 // read from configuration, never from the frontend.
@@ -65,9 +66,9 @@ export class QuotesService {
     const order = await this.repository.findOrderForQuote(workOrderId);
     if (!order) throw new ConflictException('Work order not found or has no diagnostic');
     // HU-21 / BE-E06: a quote may be emitted for the first time from
-    // EN_DIAGNOSTICO or re-emitted (append-only, superseding the previous
-    // lines) while the previous budget is PRESUPUESTO_ENVIADO or RECHAZADO.
-    if (!['EN_DIAGNOSTICO', 'PRESUPUESTO_ENVIADO', 'RECHAZADO'].includes(order.status)) {
+    // IN_DIAGNOSIS or re-emitted (append-only, superseding the previous
+    // lines) while the previous budget is QUOTE_SENT or REJECTED.
+    if (![WorkOrderStatus.IN_DIAGNOSIS, WorkOrderStatus.QUOTE_SENT, WorkOrderStatus.REJECTED].includes(order.status as WorkOrderStatus)) {
       throw new ConflictException('Work order state does not allow generating or re-emitting the quote');
     }
     const laborHourlyRate = new Prisma.Decimal(
@@ -79,14 +80,14 @@ export class QuotesService {
   async approve(workOrderId: string, dto: ApproveQuoteDto, recordedBy: string): Promise<QuoteDecisionResponseDto> {
     const context = await this.repository.findDecisionContext(workOrderId);
     if (!context) throw new NotFoundException('Quote not found');
-    if (context.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
+    if (context.workOrder.status !== WorkOrderStatus.QUOTE_SENT) throw new ConflictException('Quote is not awaiting a decision');
     return this.repository.approve(workOrderId, dto, recordedBy);
   }
 
   async reject(workOrderId: string, dto: RejectQuoteDto, recordedBy: string): Promise<QuoteDecisionResponseDto> {
     const context = await this.repository.findDecisionContext(workOrderId);
     if (!context) throw new NotFoundException('Quote not found');
-    if (context.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
+    if (context.workOrder.status !== WorkOrderStatus.QUOTE_SENT) throw new ConflictException('Quote is not awaiting a decision');
     return this.repository.reject(workOrderId, dto, recordedBy);
   }
 }

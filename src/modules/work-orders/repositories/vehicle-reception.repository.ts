@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '../../../generated/prisma/client';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
+import { WorkOrderStatus } from '../../../common/enums/work-order-status.enum';
 
 export interface AvailableWorkOrderRow {
   id: string;
@@ -89,11 +90,11 @@ export class VehicleReceptionRepository {
     });
   }
 
-  // HU-12: list work orders awaiting a quote (EN_DIAGNOSTICO). No monetary
+  // HU-12: list work orders awaiting a quote (IN_DIAGNOSIS). No monetary
   // fields are exposed to the advisor list (RN-16).
   findPendingQuoteOrders() {
     return this.prisma.workOrder.findMany({
-      where: { status: 'EN_DIAGNOSTICO' },
+      where: { status: WorkOrderStatus.IN_DIAGNOSIS },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -109,7 +110,7 @@ export class VehicleReceptionRepository {
 
   findAvailable(page: number, pageSize: number): Promise<AvailableWorkOrderRow[]> {
     return this.prisma.workOrder.findMany({
-      where: { status: 'RECIBIDO', mechanicId: null },
+      where: { status: WorkOrderStatus.RECEIVED, mechanicId: null },
       orderBy: { createdAt: 'asc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -147,7 +148,7 @@ export class VehicleReceptionRepository {
   }
 
   countAvailable(): Promise<number> {
-    return this.prisma.workOrder.count({ where: { status: 'RECIBIDO', mechanicId: null } });
+    return this.prisma.workOrder.count({ where: { status: WorkOrderStatus.RECEIVED, mechanicId: null } });
   }
 
   async findActiveMechanics(page: number, pageSize: number): Promise<ActiveMechanicRow[]> {
@@ -179,7 +180,7 @@ export class VehicleReceptionRepository {
   // monitoring query (US-18).
   //
   // US-16 / RN-06 (BE-T16.3): when the service passes a staleQuoteCutoff, the
-  // query filters at the database to PRESUPUESTO_ENVIADO orders whose quote was
+  // query filters at the database to QUOTE_SENT orders whose quote was
   // emitted before that date (15+ days waiting approval).
   //
   // BE-E13 / BE-24: page and pageSize paginate the row set; the same filters
@@ -280,7 +281,7 @@ export class VehicleReceptionRepository {
       ...(filters.workBayId ? { currentBay: { is: { id: filters.workBayId } } } : {}),
       ...(filters.staleQuoteCutoff
         ? {
-            status: 'PRESUPUESTO_ENVIADO',
+            status: WorkOrderStatus.QUOTE_SENT,
             quote: { is: { createdAt: { lte: filters.staleQuoteCutoff } } },
           }
         : {}),

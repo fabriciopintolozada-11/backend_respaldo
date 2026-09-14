@@ -50,7 +50,7 @@ export class WorkOrdersService {
     return this.vehicleReception.getDiagnostic(id);
   }
 
-  // HU-12: list work orders in EN_DIAGNOSTICO that are ready to be quoted.
+  // HU-12: list work orders in IN_DIAGNOSIS that are ready to be quoted.
   getPendingQuoteOrders() {
     return this.vehicleReception.getPendingQuoteOrders();
   }

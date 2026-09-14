@@ -37,7 +37,7 @@ describe('WorkBayRepository (US-18)', () => {
           id: 'bay-1', bayNumber: 1, isOccupied: true, currentWorkOrderId: 'wo-1',
           createdAt: new Date(), updatedAt: new Date(),
           currentWorkOrder: {
-            id: 'wo-1', status: 'EN_REPARACION', assignedAt: new Date(),
+            id: 'wo-1', status: 'IN_REPAIR', assignedAt: new Date(),
             vehicle: { plate: '4589-KXA', brand: 'Toyota', model: 'Hilux' },
             mechanic: { id: '11111111-1111-4111-8111-111111111111' },
           },
@@ -70,7 +70,7 @@ describe('WorkBayRepository (US-18)', () => {
       workBay.findUnique.mockResolvedValue({
         id: 'bay-2', bayNumber: 2, isOccupied: false, currentWorkOrderId: null,
       });
-      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'APROBADO' });
+      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'APPROVED' });
       workBay.findFirst.mockResolvedValueOnce({
         id: 'bay-1', bayNumber: 1, isOccupied: true, currentWorkOrderId: 'wo-1',
       });
@@ -109,7 +109,7 @@ describe('WorkBayRepository (US-18)', () => {
       workBay.findUnique.mockResolvedValue({
         id: 'bay-2', bayNumber: 2, isOccupied: true, currentWorkOrderId: 'wo-9',
       });
-      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'EN_REPARACION' });
+      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'IN_REPAIR' });
 
       await expect(repository.assignWorkOrder('bay-2', 'wo-1')).rejects.toBeInstanceOf(ConflictException);
       expect(workBay.update).not.toHaveBeenCalled();
@@ -117,10 +117,10 @@ describe('WorkBayRepository (US-18)', () => {
 
     it('rejects with 422 semantics when the work order is in a closed state', async () => {
       workBay.findUnique.mockResolvedValue({ id: 'bay-2', isOccupied: false, currentWorkOrderId: null });
-      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'ENTREGADO' });
+      workOrder.findUnique.mockResolvedValue({ id: 'wo-1', status: 'DELIVERED' });
 
       await expect(repository.assignWorkOrder('bay-2', 'wo-1')).rejects.toThrow(
-        'Work order in status "ENTREGADO" cannot be assigned to a bay',
+        'Work order in status "DELIVERED" cannot be assigned to a bay',
       );
       expect(workBay.update).not.toHaveBeenCalled();
     });
