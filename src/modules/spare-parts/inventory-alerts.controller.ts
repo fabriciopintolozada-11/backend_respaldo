@@ -1,7 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ListInventoryAlertsResponseDto } from './dto/list-inventory-alerts.response.dto';
@@ -11,7 +9,6 @@ import { SparePartsService } from './spare-parts.service';
 @ApiTags('inventory')
 @ApiBearerAuth()
 @Controller('inventory')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
 export class InventoryAlertsController {
   constructor(private readonly service: SparePartsService) {}

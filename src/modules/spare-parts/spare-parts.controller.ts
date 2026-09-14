@@ -1,7 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { SparePartsService } from './spare-parts.service';
@@ -17,7 +15,6 @@ import { Request } from 'express';
 @ApiTags('spare-parts')
 @ApiBearerAuth()
 @Controller('spare-parts')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.MECHANIC, UserRole.ADMIN)
 export class SparePartsController {
   constructor(private readonly service: SparePartsService) {}

@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 import request from 'supertest';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/common/guards/roles.guard';
 import { UserRole } from '../src/common/enums/user-role.enum';
 import { QuotesController } from '../src/modules/quotes/quotes.controller';
@@ -37,14 +36,14 @@ describe('Quote approval endpoints (e2e) — US-09', () => {
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: QuoteRepository, useValue: repository },
       ],
-    })
-      .overrideGuard(JwtAuthGuard)
-      .useClass(TestAuthGuard)
-      .compile();
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.setGlobalPrefix('api/v1');
+    // BE-E08: guards are global (APP_GUARD) in production; this isolated module
+    // replicates the real setup with the role-header stub in place of JWT.
+    app.useGlobalGuards(new TestAuthGuard(), moduleFixture.get(RolesGuard));
     await app.init();
   });
 

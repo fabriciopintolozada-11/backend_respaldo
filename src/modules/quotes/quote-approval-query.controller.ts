@@ -1,7 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ListQuoteApprovalResponseDto } from './dto/quote-approval-query-response.dto';
@@ -11,7 +9,6 @@ import { QuotesService } from './quotes.service';
 @ApiTags('quotes')
 @ApiBearerAuth()
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class QuoteApprovalQueryController {
   constructor(private readonly service: QuotesService) {}
 

@@ -1,8 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateQuoteDto } from './dto/create-quote.dto';
@@ -16,7 +14,6 @@ import { QuotesService } from './quotes.service';
 @ApiTags('quotes')
 @ApiBearerAuth()
 @Controller('work-orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
 export class QuotesController {
   constructor(private readonly service: QuotesService) {}
