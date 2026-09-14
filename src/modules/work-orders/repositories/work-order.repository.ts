@@ -529,6 +529,9 @@ export class WorkOrderRepository {
               partsSubtotal: true,
               total: true,
               parts: {
+                // BE-E06 / HU-21: only live part lines take part in the annex
+                // extension; SUPERSEDED history and consumed parts are ignored.
+                where: { status: { notIn: ['SUPERSEDED', 'INSTALLED'] } },
                 select: { id: true, sparePartId: true, quantity: true, unitPrice: true, status: true },
               },
             },
@@ -1165,6 +1168,9 @@ export class WorkOrderRepository {
             partsSubtotal: true,
             currency: true,
             parts: {
+              // BE-E06 / HU-21: superseded re-quote lines never appear in the
+              // settlement view.
+              where: { status: { not: 'SUPERSEDED' } },
               select: {
                 id: true,
                 status: true,

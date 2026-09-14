@@ -27,7 +27,8 @@ describe('QuoteRepository', () => {
         update: jest.fn().mockResolvedValue(undefined),
       },
       quote: {
-        upsert: jest.fn().mockResolvedValue(quote),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(quote),
       },
       sparePart: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -41,8 +42,13 @@ describe('QuoteRepository', () => {
     }, new Prisma.Decimal('50'));
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(tx.quote.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ total: new Prisma.Decimal('100'), currency: 'BOB' }),
+    // BE-E06: a first emission creates the quote; no upsert with deleteMany.
+    expect(tx.quote.findUnique).toHaveBeenCalledWith({
+      where: { workOrderId: 'work-order-id' },
+      select: { id: true },
+    });
+    expect(tx.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ total: new Prisma.Decimal('100'), currency: 'BOB' }),
     }));
     expect(tx.workOrder.update).toHaveBeenCalledWith({
       where: { id: 'work-order-id' },
@@ -55,7 +61,10 @@ describe('QuoteRepository', () => {
   it('calculates decimal subtotals and totals with Prisma.Decimal', async () => {
     const tx = {
       workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() },
-      quote: { upsert: jest.fn().mockResolvedValue({ id: 'q', details: [], total: new Prisma.Decimal('20.12'), currency: 'BOB', createdAt: new Date() }) },
+      quote: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'q', details: [], total: new Prisma.Decimal('20.12'), currency: 'BOB', createdAt: new Date() }),
+      },
       sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'part-1', unitPrice: new Prisma.Decimal('0.2') }]) },
     };
     const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
@@ -63,21 +72,22 @@ describe('QuoteRepository', () => {
        { description: 'Parte', itemType: QuoteItemType.PART, quantity: 0.1, unitPrice: 0.2, sparePartId: 'part-1' },
       { description: 'Mano de obra', itemType: QuoteItemType.LABOR, quantity: 2, unitPrice: 10.05 },
     ] }, new Prisma.Decimal('10.05'));
-    const create = tx.quote.upsert.mock.calls[0][0].create;
-    expect(create.total).toEqual(new Prisma.Decimal('20.12'));
-    expect(create.details.create[0].subtotal).toEqual(new Prisma.Decimal('0.02'));
-    expect(create.details.create[1].subtotal).toEqual(new Prisma.Decimal('20.10'));
+    const data = tx.quote.create.mock.calls[0][0].data;
+    expect(data.total).toEqual(new Prisma.Decimal('20.12'));
+    expect(data.details.create[0].subtotal).toEqual(new Prisma.Decimal('0.02'));
+    expect(data.details.create[1].subtotal).toEqual(new Prisma.Decimal('20.10'));
   });
 
   it('rejects a missing work order before quote persistence', async () => {
-    const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue(null) }, quote: { upsert: jest.fn() } };
+    const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue(null) }, quote: { findUnique: jest.fn(), create: jest.fn() } };
     const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
     await expect(new QuoteRepository(prisma as never).create('missing', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1 }] }, new Prisma.Decimal('65'))).rejects.toThrow('Work order not found');
-    expect(tx.quote.upsert).not.toHaveBeenCalled();
+    expect(tx.quote.findUnique).not.toHaveBeenCalled();
+    expect(tx.quote.create).not.toHaveBeenCalled();
   });
 
   it('does not update the work order when quote persistence fails', async () => {
-     const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() }, quote: { upsert: jest.fn().mockRejectedValue(new Error('database failure')) }, sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'part-1', unitPrice: new Prisma.Decimal('0.2') }]) } };
+     const tx = { workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() }, quote: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockRejectedValue(new Error('database failure')) }, sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'part-1', unitPrice: new Prisma.Decimal('0.2') }]) } };
     const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
      await expect(new QuoteRepository(prisma as never).create('order-1', { items: [{ description: 'Parte', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 1, sparePartId: 'part-1' }] }, new Prisma.Decimal('65'))).rejects.toThrow('database failure');
     expect(tx.workOrder.update).not.toHaveBeenCalled();

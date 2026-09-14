@@ -64,8 +64,11 @@ export class QuotesService {
     }
     const order = await this.repository.findOrderForQuote(workOrderId);
     if (!order) throw new ConflictException('Work order not found or has no diagnostic');
-    if (order.status !== 'EN_DIAGNOSTICO') {
-      throw new ConflictException('Work order must have a diagnostic pending quote');
+    // HU-21 / BE-E06: a quote may be emitted for the first time from
+    // EN_DIAGNOSTICO or re-emitted (append-only, superseding the previous
+    // lines) while the previous budget is PRESUPUESTO_ENVIADO or RECHAZADO.
+    if (!['EN_DIAGNOSTICO', 'PRESUPUESTO_ENVIADO', 'RECHAZADO'].includes(order.status)) {
+      throw new ConflictException('Work order state does not allow generating or re-emitting the quote');
     }
     const laborHourlyRate = new Prisma.Decimal(
       this.configService.get<string>('LABOR_HOURLY_RATE') ?? DEFAULT_LABOR_HOURLY_RATE,

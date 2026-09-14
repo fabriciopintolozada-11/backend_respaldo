@@ -15,7 +15,8 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
       const tx = {
         workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() },
         quote: {
-          upsert: jest.fn().mockResolvedValue({
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({
             id: 'q',
             details: [],
             total: new Prisma.Decimal('210.00'),
@@ -39,24 +40,27 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
         ],
       }, new Prisma.Decimal('65'));
 
-      const create = tx.quote.upsert.mock.calls[0][0].create;
-      expect(create.total).toEqual(new Prisma.Decimal('209.75'));
-      expect(create.partsSubtotal).toEqual(new Prisma.Decimal('47.25'));
-      expect(create.laborSubtotal).toEqual(new Prisma.Decimal('162.50'));
+      const data = tx.quote.create.mock.calls[0][0].data;
+      expect(data.total).toEqual(new Prisma.Decimal('209.75'));
+      expect(data.partsSubtotal).toEqual(new Prisma.Decimal('47.25'));
+      expect(data.laborSubtotal).toEqual(new Prisma.Decimal('162.50'));
       // QuotePart.quantity is a SMALLINT: the exact validated integer is sent,
       // never a Number(decimal) round trip.
-      expect(create.parts.create[0].quantity).toBe(3);
-      expect(create.parts.create[0].subtotal).toEqual(new Prisma.Decimal('47.25'));
-      expect(create.parts.create[0].unitPrice).toEqual(new Prisma.Decimal('15.75'));
+      expect(data.parts.create[0].quantity).toBe(3);
+      expect(data.parts.create[0].subtotal).toEqual(new Prisma.Decimal('47.25'));
+      expect(data.parts.create[0].unitPrice).toEqual(new Prisma.Decimal('15.75'));
       // QuoteDetail keeps the Decimal quantity for labor hours.
-      expect(create.details.create[1].quantity).toEqual(new Prisma.Decimal('2.5'));
-      expect(create.details.create[1].subtotal).toEqual(new Prisma.Decimal('162.50'));
+      expect(data.details.create[1].quantity).toEqual(new Prisma.Decimal('2.5'));
+      expect(data.details.create[1].subtotal).toEqual(new Prisma.Decimal('162.50'));
     });
 
     it('dedupes repeated parts by merging integer quantities before pricing', async () => {
       const tx = {
         workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() },
-        quote: { upsert: jest.fn().mockResolvedValue({ id: 'q', details: [], total: new Prisma.Decimal('63.00'), currency: 'BOB', createdAt: new Date() }) },
+        quote: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({ id: 'q', details: [], total: new Prisma.Decimal('63.00'), currency: 'BOB', createdAt: new Date() }),
+        },
         sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'part-1', unitPrice: new Prisma.Decimal('15.75') }]) },
       };
       const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
@@ -68,16 +72,16 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
         ],
       }, new Prisma.Decimal('65'));
 
-      const create = tx.quote.upsert.mock.calls[0][0].create;
-      expect(create.partsSubtotal).toEqual(new Prisma.Decimal('63.00'));
-      expect(create.parts.create[0].quantity).toBe(4);
-      expect(create.parts.create[0].subtotal).toEqual(new Prisma.Decimal('63.00'));
+      const data = tx.quote.create.mock.calls[0][0].data;
+      expect(data.partsSubtotal).toEqual(new Prisma.Decimal('63.00'));
+      expect(data.parts.create[0].quantity).toBe(4);
+      expect(data.parts.create[0].subtotal).toEqual(new Prisma.Decimal('63.00'));
     });
 
     it('throws when a part has no catalog price and does not persist (error path)', async () => {
       const tx = {
         workOrder: { findUnique: jest.fn().mockResolvedValue({ id: 'order-1' }), update: jest.fn() },
-        quote: { upsert: jest.fn() },
+        quote: { findUnique: jest.fn(), create: jest.fn() },
         sparePart: { findMany: jest.fn().mockResolvedValue([{ id: 'other-part', unitPrice: new Prisma.Decimal('5') }]) },
       };
       const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
@@ -87,7 +91,8 @@ describe('BE-P05 exact decimal math (HU-12 / RN-21)', () => {
           items: [{ description: 'Inexistente', itemType: QuoteItemType.PART, quantity: 1, unitPrice: 10, sparePartId: 'part-x' }],
         }, new Prisma.Decimal('65')),
       ).rejects.toThrow(NotFoundException);
-      expect(tx.quote.upsert).not.toHaveBeenCalled();
+      expect(tx.quote.findUnique).not.toHaveBeenCalled();
+      expect(tx.quote.create).not.toHaveBeenCalled();
     });
   });
 

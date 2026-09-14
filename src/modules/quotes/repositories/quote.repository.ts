@@ -22,9 +22,11 @@ export class QuoteRepository {
       const order = await tx.workOrder.findUnique({ where: { id: workOrderId }, select: { id: true } });
       if (!order) throw new NotFoundException('Work order not found');
 
-      // HU-12 / BE-E03: before cleaning the previous budget (upsert deletes the
-      // quote parts), any part that is still RESERVED for this work order is
-      // released back to the available stock in the same transaction.
+      // BE-E06 (HU-21): budget lines are never physically deleted. Before the
+      // previous budget is superseded, any part that is still RESERVED for this
+      // work order is released back to the available stock in the same
+      // transaction (HU-07 / BE-E03). The stock is only released, never newly
+      // reserved here.
       await releaseReservedParts(tx, workOrderId);
 
       const partIds = dto.items.filter((item) => item.itemType === QuoteItemType.PART).map((item) => item.sparePartId);
@@ -84,12 +86,13 @@ export class QuoteRepository {
       const total = details.reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
       const laborSubtotal = details.filter((item) => item.itemType === QuoteItemType.LABOR).reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
       const partsSubtotal = details.filter((item) => item.itemType === QuoteItemType.PART).reduce((sum, item) => sum.plus(item.subtotal), new Prisma.Decimal(0));
-      const quote = await tx.quote.upsert({
-        where: { workOrderId },
-        update: { total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { deleteMany: {}, create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { deleteMany: {}, create: partItems.map((item) => ({ sparePartId: item.sparePartId, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
-        create: { workOrderId, total, laborSubtotal, partsSubtotal, currency: 'BOB', details: { create: details.map((item) => ({ description: item.description, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) }, parts: { create: partItems.map((item) => ({ sparePartId: item.sparePartId, quantity: item.quantity, unitPrice: item.unitPrice, subtotal: item.subtotal })) } },
-        include: { details: true },
-      });
+      const quote = await this.persistQuoteLines(
+        tx,
+        workOrderId,
+        details,
+        partItems,
+        { total, laborSubtotal, partsSubtotal },
+      );
       await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'PRESUPUESTO_ENVIADO' } });
       return { id: quote.id, workOrderId, items: quote.details.map((item: { id: string; description: string; itemType: string; quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; subtotal: Prisma.Decimal }) => ({ id: item.id, description: item.description, itemType: item.itemType as QuoteItemType, quantity: item.quantity.toString(), unitPrice: item.unitPrice.toString(), subtotal: item.subtotal.toString() })), total: quote.total.toString(), laborSubtotal: laborSubtotal.toString(), partsSubtotal: partsSubtotal.toString(), currency: quote.currency, createdAt: quote.createdAt };
     });
@@ -148,8 +151,8 @@ export class QuoteRepository {
         partsSubtotal: true,
         currency: true,
         createdAt: true,
-        details: { orderBy: { id: 'asc' } },
-        parts: { orderBy: { id: 'asc' }, select: { status: true, sparePart: { select: { code: true } } } },
+        details: { where: { status: 'ACTIVE' }, orderBy: { id: 'asc' } },
+        parts: { where: { status: { in: ['PROPOSED', 'RESERVED', 'RELEASED'] } }, orderBy: { id: 'asc' }, select: { status: true, sparePart: { select: { code: true } } } },
         workOrder: {
           select: {
             id: true,
@@ -227,11 +230,88 @@ export class QuoteRepository {
     return result;
   }
 
+  // BE-E06 / HU-21: append-only budget persistence. If the work order already
+  // has a quote, its active lines are superseded (SUPERSEDED, never deleted)
+  // and the new lines are appended as PROPOSED/ACTIVE; INSTALLED parts and
+  // already-superseded rows are left untouched. Otherwise the quote is created
+  // from scratch. Returns the active detail rows for the response mapping.
+  private async persistQuoteLines(
+    tx: Prisma.TransactionClient,
+    workOrderId: string,
+    details: Array<{
+      description: string;
+      itemType: QuoteItemType;
+      quantity: Prisma.Decimal;
+      unitPrice: Prisma.Decimal;
+      subtotal: Prisma.Decimal;
+      sparePartId?: string;
+    }>,
+    partItems: Array<{
+      sparePartId: string;
+      quantity: number;
+      unitPrice: Prisma.Decimal;
+      subtotal: Prisma.Decimal;
+    }>,
+    totals: { total: Prisma.Decimal; laborSubtotal: Prisma.Decimal; partsSubtotal: Prisma.Decimal },
+  ) {
+    const detailRows = details.map((item) => ({
+      description: item.description,
+      itemType: item.itemType,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: item.subtotal,
+    }));
+    const partRows = partItems.map((item) => ({
+      sparePartId: item.sparePartId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: item.subtotal,
+    }));
+
+    const existing = await tx.quote.findUnique({ where: { workOrderId }, select: { id: true } });
+    if (existing) {
+      // Re-quote: supersede every live line of the previous budget (except
+      // INSTALLED parts that were physically consumed and rows already
+      // superseded) and append the new proposal as the active one.
+      return tx.quote.update({
+        where: { id: existing.id },
+        data: {
+          total: totals.total,
+          laborSubtotal: totals.laborSubtotal,
+          partsSubtotal: totals.partsSubtotal,
+          currency: 'BOB',
+          details: {
+            updateMany: { where: { status: 'ACTIVE' }, data: { status: 'SUPERSEDED' } },
+            create: detailRows,
+          },
+          parts: {
+            updateMany: { where: { status: { notIn: ['INSTALLED', 'SUPERSEDED'] } }, data: { status: 'SUPERSEDED' } },
+            create: partRows,
+          },
+        },
+        include: { details: { where: { status: 'ACTIVE' }, orderBy: { id: 'asc' } } },
+      });
+    }
+
+    return tx.quote.create({
+      data: {
+        workOrderId,
+        total: totals.total,
+        laborSubtotal: totals.laborSubtotal,
+        partsSubtotal: totals.partsSubtotal,
+        currency: 'BOB',
+        details: { create: detailRows },
+        parts: { create: partRows },
+      },
+      include: { details: { where: { status: 'ACTIVE' }, orderBy: { id: 'asc' } } },
+    });
+  }
+
   approve(workOrderId: string, dto: ApproveQuoteDto, recordedBy: string): Promise<QuoteDecisionResponseDto> {
     return this.prisma.$transaction(async (tx) => {
       const quote = await tx.quote.findUnique({
         where: { workOrderId },
-        select: { id: true, workOrder: { select: { id: true, vehicleId: true, mechanicId: true, status: true } }, parts: { select: { id: true, sparePartId: true, quantity: true, status: true } }, approvals: { select: { id: true } } },
+        select: { id: true, workOrder: { select: { id: true, vehicleId: true, mechanicId: true, status: true } }, parts: { where: { status: 'PROPOSED' }, select: { id: true, sparePartId: true, quantity: true, status: true } }, approvals: { select: { id: true } } },
       });
       if (!quote) throw new NotFoundException('Quote not found');
       if (quote.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
@@ -276,7 +356,13 @@ export class QuoteRepository {
       // but if the OT somehow retained a reservation it is freed atomically.
       await releaseReservedParts(tx, workOrderId);
 
-      await tx.quotePart.updateMany({ where: { quoteId: quote.id }, data: { status: 'RELEASED' } });
+      // BE-E06 / HU-21: only live (PROPOSED/RESERVED) lines are closed as
+      // RELEASED. SUPERSEDED history and INSTALLED parts that were already
+      // consumed are left untouched.
+      await tx.quotePart.updateMany({
+        where: { quoteId: quote.id, status: { in: ['PROPOSED', 'RESERVED'] } },
+        data: { status: 'RELEASED' },
+      });
       await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'RECHAZADO' } });
       await tx.technicalHistory.create({ data: { vehicleId: quote.workOrder.vehicleId, description: `Quote rejected for work order ${workOrderId}: ${dto.reason}` } });
       const approval = await tx.quoteApproval.create({ data: { quoteId: quote.id, decision: QuoteDecision.REJECTED, reason: dto.reason, recordedBy } });

@@ -60,7 +60,8 @@ describe('QuoteRepository quote decisions', () => {
     const result = await new QuoteRepository(prisma as never).reject('order-1', { reason: 'Cliente no autoriza' }, 'user-1');
 
     expect(tx.sparePart.updateMany).not.toHaveBeenCalled();
-    expect(tx.quotePart.updateMany).toHaveBeenCalledWith({ where: { quoteId: 'quote-1' }, data: { status: 'RELEASED' } });
+    // BE-E06: only live (PROPOSED/RESERVED) lines are closed as RELEASED.
+    expect(tx.quotePart.updateMany).toHaveBeenCalledWith({ where: { quoteId: 'quote-1', status: { in: ['PROPOSED', 'RESERVED'] } }, data: { status: 'RELEASED' } });
     expect(result.decision).toBe(QuoteDecision.REJECTED);
   });
 });
