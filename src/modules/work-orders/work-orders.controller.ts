@@ -11,6 +11,7 @@ import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from './dto/diagnostic-response.dto';
 import { PendingQuoteWorkOrderResponseDto } from './dto/pending-quote-work-order.response.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
+import { ReturnSparePartDto } from './dto/return-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
@@ -169,6 +170,26 @@ export class WorkOrdersController {
     @Req() request: Request,
   ): Promise<WorkOrderPartResponseDto> {
     return this.service.consumePart(id, request.user.id, request.user.role, dto);
+  }
+
+  // HU-07 / BE-E03: physically return a consumed spare part and restore the
+  // discounted stock. Only the assigned mechanic or the workshop lead can do it
+  // (RN-04); the quantity is bounded by the net consumed units (RN-01).
+  @Post('work-orders/:id/return-part')
+  @Roles(UserRole.MECHANIC, UserRole.WORKSHOP_LEAD)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Return a consumed spare part and restore the physical stock (HU-07, BE-E03, RN-04, RN-01, RN-08, RN-19)' })
+  @ApiResponse({ status: 200, type: WorkOrderPartResponseDto })
+  @ApiResponse({ status: 403, description: 'Insufficient role for this operation' })
+  @ApiResponse({ status: 404, description: 'Work order or spare part not found' })
+  @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status' })
+  @ApiResponse({ status: 422, description: 'Mechanic ownership, part association or net consumed quantity rules violated' })
+  returnPart(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReturnSparePartDto,
+    @Req() request: Request,
+  ): Promise<WorkOrderPartResponseDto> {
+    return this.service.returnPart(id, request.user.id, request.user.role, dto);
   }
 
   // US-13 / RN-05: set a work order to EN_ESPERA_DE_REPUESTO when a spare

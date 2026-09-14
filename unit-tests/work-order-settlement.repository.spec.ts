@@ -31,14 +31,20 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
             laborSubtotal: new Prisma.Decimal('650.00'),
             currency: 'BOB',
             parts: [
-              { subtotal: new Prisma.Decimal('200.00') },
-              { subtotal: new Prisma.Decimal('100.00') },
+              { subtotal: new Prisma.Decimal('200.00'), status: 'INSTALLED', quantity: 1, sparePartId: 'sp-1', id: 'qp-1' },
+              { subtotal: new Prisma.Decimal('100.00'), status: 'INSTALLED', quantity: 1, sparePartId: 'sp-2', id: 'qp-2' },
             ],
           },
           settlementAdjustments: [],
         }),
         update: jest.fn().mockResolvedValue(undefined),
       },
+      // BE-E03: the release helper only touches RESERVED lines. These INSTALLED
+      // lines (fully consumed) yield a pending reservation of zero, so no spare
+      // part line is released and the consumed stock is left untouched.
+      stockMovement: { aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 1 } }) },
+      sparePart: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      quotePart: { update: jest.fn().mockResolvedValue(undefined) },
       settlementAdjustment: {
         create: jest.fn().mockImplementation(({ data }) =>
           Promise.resolve({ id: 'adj-mock', createdAt: new Date(), ...data }),

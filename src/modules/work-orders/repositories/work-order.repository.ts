@@ -8,7 +8,9 @@ import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
 import { ConsumeSparePartDto } from '../dto/consume-spare-part.dto';
+import { ReturnSparePartDto } from '../dto/return-spare-part.dto';
 import { WorkOrderPartResponseDto } from '../dto/work-order-part.response.dto';
+import { releaseReservedParts } from './reserved-parts-release';
 import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 import { CompleteWorkOrderDto } from '../dto/complete-work-order.dto';
@@ -855,6 +857,133 @@ export class WorkOrderRepository {
     });
   }
 
+  // HU-07 / BE-E03 / BE-16 / RN-08 / RN-19: atomically return a spare part that
+  // was already consumed (installed) in a work order. The physical and available
+  // stock are restored, the kardex IN movement and the immutable technical
+  // history entry are recorded, and the quote part line is released when no
+  // unit of it remains installed. RN-01 is enforced against the net consumed
+  // units (OUT - IN) of the part for this work order, so the returned quantity
+  // can never exceed what was actually discounted and stock is never restored
+  // twice.
+  returnPart(
+    workOrderId: string,
+    dto: ReturnSparePartDto,
+    userId: string,
+  ): Promise<WorkOrderPartResponseDto> {
+    return this.prisma.$transaction(async (transaction) => {
+      const order = await transaction.workOrder.findUnique({
+        where: { id: workOrderId },
+        select: {
+          id: true,
+          status: true,
+          vehicleId: true,
+          quote: {
+            select: {
+              parts: {
+                where: { sparePartId: dto.sparePartId },
+                select: {
+                  id: true,
+                  sparePartId: true,
+                  quantity: true,
+                  status: true,
+                  sparePart: { select: { code: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      const part = order?.quote?.parts?.[0];
+      if (!order || !part) throw new NotFoundException('Work order not found');
+
+      // RN-01: only units that were actually discounted can be returned. The
+      // net consumed amount already discounts previous returns (kardex IN).
+      const movements = await transaction.stockMovement.groupBy({
+        by: ['type'],
+        where: { workOrderId, sparePartId: part.sparePartId },
+        _sum: { quantity: true },
+      });
+      let netConsumed = 0;
+      for (const movement of movements) {
+        if (movement.type === 'OUT') netConsumed += movement._sum.quantity ?? 0;
+        if (movement.type === 'IN') netConsumed -= movement._sum.quantity ?? 0;
+      }
+      if (netConsumed <= 0) {
+        throw new UnprocessableEntityException(
+          'RN-01: the spare part has not been consumed in this work order',
+        );
+      }
+      if (dto.quantity > netConsumed) {
+        throw new UnprocessableEntityException(
+          'RN-01: quantity exceeds the net consumed units of the spare part for this work order',
+        );
+      }
+
+      const sparePart = await transaction.sparePart.findUnique({
+        where: { id: part.sparePartId },
+        select: { physicalStock: true, isActive: true },
+      });
+      if (!sparePart || !sparePart.isActive) {
+        throw new NotFoundException('Spare part not found or inactive');
+      }
+
+      // RN-08: restore the discounted physical stock. The reserved stock is
+      // left untouched (the reserved units were already consumed) and the
+      // available stock is increased to keep recentered on physical stock, so
+      // the balance available = physical - reserved is never corrupted.
+      const newPhysicalStock = sparePart.physicalStock + dto.quantity;
+      await transaction.sparePart.update({
+        where: { id: part.sparePartId },
+        data: {
+          physicalStock: { increment: dto.quantity },
+          availableStock: { increment: dto.quantity },
+          lastMovementAt: new Date(),
+        },
+      });
+
+      // BE-17: immutable kardex record (audit trail, never updated/deleted);
+      // the mechanic's optional note is persisted as the movement reason.
+      await transaction.stockMovement.create({
+        data: {
+          workOrderId,
+          sparePartId: part.sparePartId,
+          userId,
+          quantity: dto.quantity,
+          type: 'IN',
+          reason: dto.notes ?? `Spare part returned to stock for work order ${workOrderId}`,
+          previousPhysicalStock: sparePart.physicalStock,
+          newPhysicalStock,
+        },
+      });
+
+      // The quote part line keeps being billed while it still has installed
+      // units; when nothing remains installed it is fully released.
+      const remainingInstalled = netConsumed - dto.quantity;
+      const nextStatus = remainingInstalled <= 0 ? 'RELEASED' : 'INSTALLED';
+      await transaction.quotePart.update({
+        where: { id: part.id },
+        data: { status: nextStatus },
+      });
+
+      // RN-19: permanent technical history entry.
+      await transaction.technicalHistory.create({
+        data: {
+          vehicleId: order.vehicleId,
+          description: `Spare part returned to stock for work order ${workOrderId}: ${part.sparePart.code} x${dto.quantity} by user ${userId}`,
+        },
+      });
+
+      // RN-16: return only the agreed allowlist. No financial fields.
+      return {
+        id: part.id,
+        code: part.sparePart.code,
+        name: part.sparePart.name,
+        quantity: dto.quantity,
+        status: nextStatus,
+      };
+    });
+  }
+
   // US-13: read context needed to validate an awaiting-part transition.
   // Returns ownership, status and the quote parts linked to this work order
   // so the service can verify the missingPartId belongs to the order.
@@ -1100,6 +1229,11 @@ export class WorkOrderRepository {
       if (order.deliveredAt) {
         throw new ConflictException('Work order has already been delivered');
       }
+
+      // HU-07 / BE-E03: parts that were never consumed (still RESERVED) are
+      // released back to the available stock on the same transaction, so the
+      // inventory is not permanently blocked once the vehicle is delivered.
+      await releaseReservedParts(transaction, workOrderId);
 
       // RN-21: total = approved labor subtotal + installed parts subtotal.
       const laborSubtotal = order.quote?.laborSubtotal ?? new Prisma.Decimal(0);
