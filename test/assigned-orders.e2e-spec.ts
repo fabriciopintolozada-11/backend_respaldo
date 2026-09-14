@@ -42,6 +42,7 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
         { id: mechanicId, isActive: true },
         { id: otherMechanicId, isActive: true },
       ],
+      skipDuplicates: true,
     });
     const customer = await prisma.customer.create({ data: { identification, name: 'Cliente HU-03' } });
     customerId = customer.id;
@@ -117,11 +118,16 @@ describe('AssignedOrdersController (e2e) — HU-03', () => {
   });
 
   afterAll(async () => {
-    await prisma.additionalFinding.deleteMany({ where: { workOrderId: { in: [ownWorkOrderId, ownWorkOrder2Id] } } });
-    await prisma.workOrder.deleteMany({ where: { vehicleId } });
+    const orderIds = [ownWorkOrderId, ownWorkOrder2Id].filter((id): id is string => Boolean(id));
+    if (orderIds.length > 0) {
+      await prisma.additionalFinding.deleteMany({ where: { workOrderId: { in: orderIds } } });
+    }
+    if (vehicleId) {
+      await prisma.workOrder.deleteMany({ where: { vehicleId } });
+      await prisma.vehicle.delete({ where: { id: vehicleId } });
+    }
     await prisma.user.deleteMany({ where: { id: mechanicId } });
-    await prisma.vehicle.delete({ where: { id: vehicleId } });
-    await prisma.customer.delete({ where: { id: customerId } });
+    if (customerId) await prisma.customer.delete({ where: { id: customerId } });
     await prisma.mechanic.deleteMany({ where: { id: { in: [mechanicId, otherMechanicId] } } });
     await app.close();
   });
