@@ -19,10 +19,13 @@ import { PublicTrackingModule } from './modules/public-tracking/public-tracking.
   imports: [
     ConfigModule.forRoot({ 
       isGlobal: true, 
-      validationSchema: Joi.object({ 
-        DATABASE_URL: Joi.string().required(), 
-        JWT_SECRET: Joi.string().min(32).required(), 
-        JWT_REFRESH_SECRET: Joi.string().min(32).required() 
+      validationSchema: Joi.object({
+        DATABASE_URL: Joi.string().required(),
+        JWT_SECRET: Joi.string().min(32).required(),
+        JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+        // BE-E14: explicit token lifetimes, no silent default.
+        JWT_EXPIRES_IN: Joi.string().pattern(/^\d+\s*[smhd]$/).required(),
+        JWT_REFRESH_EXPIRES_IN: Joi.string().pattern(/^\d+\s*[smhd]$/).required(),
       }) 
     }), 
     ThrottlerModule.forRoot([

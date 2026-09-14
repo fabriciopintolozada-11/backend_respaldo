@@ -2,9 +2,18 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { Request, Response } from 'express';
 import { Prisma } from '../../generated/prisma/client';
 
-// BE-26: unified global exception filter. Known Prisma errors (P2002, P2025)
+// BE-26 / BE-E14: unified global exception filter. Known Prisma request errors
 // are translated to standard HTTP exceptions without exposing internal
-// database details.
+// database details. Anything not recognised stays at 500.
+const PRISMA_ERROR_STATUS: Record<string, HttpStatus> = {
+  P2002: HttpStatus.CONFLICT,
+  P2003: HttpStatus.CONFLICT,
+  P2014: HttpStatus.CONFLICT,
+  P2018: HttpStatus.CONFLICT,
+  P2023: HttpStatus.BAD_REQUEST,
+  P2025: HttpStatus.NOT_FOUND,
+};
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -21,12 +30,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message =
         typeof body === 'string' ? body : ((body as { message?: string | string[] }).message ?? message);
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      if (exception.code === 'P2002') {
-        status = HttpStatus.CONFLICT;
-      } else if (exception.code === 'P2025') {
-        status = HttpStatus.NOT_FOUND;
-      }
+      status = PRISMA_ERROR_STATUS[exception.code] ?? HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Database operation failed';
+    } else if (exception instanceof Prisma.PrismaClientInitializationError) {
+      status = HttpStatus.SERVICE_UNAVAILABLE;
+      message = 'Database is unavailable';
     }
 
     response.status(status).json({

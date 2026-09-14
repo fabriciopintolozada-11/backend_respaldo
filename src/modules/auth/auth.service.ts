@@ -81,8 +81,8 @@ export class AuthService {
   private async buildAuthResponse(user: { id: string; fullName: string; username: string; role: string }): Promise<AuthResponseDto> {
     const accessSecret = this.config.getOrThrow<string>('JWT_SECRET');
     const refreshSecret = this.config.getOrThrow<string>('JWT_REFRESH_SECRET');
-    const accessExpires = (this.config.get<string>('JWT_EXPIRES_IN') ?? '15m') as StringValue;
-    const refreshExpires = (this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d') as StringValue;
+    const accessExpires = this.config.getOrThrow<StringValue>('JWT_EXPIRES_IN');
+    const refreshExpires = this.config.getOrThrow<StringValue>('JWT_REFRESH_EXPIRES_IN');
 
     const accessToken = await this.jwt.signAsync(
       { role: user.role },
