@@ -126,12 +126,12 @@ describe('WorkOrdersController (e2e) — US-19 complete / release bay', () => {
     expect(notification?.recipientId).toBe(receptionistId);
   });
 
-  it('rejects a mechanic who does not own the work order with 403 (RN-04)', async () => {
+  it('rejects a mechanic who does not own the work order with 422 (RN-04, BE-E12)', async () => {
     await request(app.getHttpServer())
       .post(`/api/v1/work-orders/${foreignOrderId}/complete`)
       .set('Authorization', otherMechanicAuthorization)
       .send({})
-      .expect(403);
+      .expect(422);
   });
 
   it('allows the workshop lead to conclude regardless of the assigned mechanic (RN-04)', async () => {

@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { WorkOrdersService } from '../src/modules/work-orders/work-orders.service';
 import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
 import { CompleteWorkOrderDto } from '../src/modules/work-orders/dto/complete-work-order.dto';
@@ -53,7 +53,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
 
   // --- RN-04: ownership validation ---
 
-  it('rejects mechanic who does not own the work order with 403 (RN-04)', async () => {
+  it('rejects mechanic who does not own the work order (RN-04, BE-E12)', async () => {
     repository.findCompleteContext.mockResolvedValue({
       ...baseContext,
       mechanicId: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
@@ -61,7 +61,7 @@ describe('WorkOrdersService - complete (US-19)', () => {
 
     await expect(
       service.complete(WORK_ORDER_ID, MECHANIC_ID, 'MECHANIC', dto),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(UnprocessableEntityException);
   });
 
   it('allows workshop lead regardless of mechanic assignment (RN-04)', async () => {
