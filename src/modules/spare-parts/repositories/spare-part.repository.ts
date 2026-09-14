@@ -143,37 +143,64 @@ export class SparePartRepository {
   // US-14 / BE-16 / BE-17 / RN-07: atomically adjust physical stock and record
   // the movement in the immutable kardex. A NEGATIVE adjustment that would
   // leave physicalStock below reservedStock is rejected at the database level.
+  //
+  // BE-E05: the guard that prevents physicalStock from going negative is
+  // expressed in the WHERE clause of an updateMany, so the check and the write
+  // are a single atomic SQL statement (same pattern as consumePart in
+  // work-order.repository.ts and the reservation in quote.repository.ts).
+  // The RN-07 invariant physicalStock >= reservedStock is verified after the
+  // update; if it fails, the thrown exception rolls back the whole transaction.
   createAdjustment(
     sparePartId: string,
     dto: CreateInventoryAdjustmentDto,
     userId: string,
   ): Promise<InventoryAdjustmentResponseDto> {
     return this.prisma.$transaction(async (tx) => {
-      const part = await tx.sparePart.findUnique({ where: { id: sparePartId } });
-      if (!part) throw new UnprocessableEntityException('Spare part not found or inactive');
-
       const delta = dto.type === InventoryAdjustmentType.POSITIVE ? dto.quantity : -dto.quantity;
-      const newPhysicalStock = part.physicalStock + delta;
 
-      // RN-07: physical stock must never drop below reserved stock.
-      if (newPhysicalStock < 0 || newPhysicalStock < part.reservedStock) {
-        throw new UnprocessableEntityException(
-          `RN-07: adjustment would result in physicalStock (${newPhysicalStock}) below reservedStock (${part.reservedStock})`,
-        );
-      }
-
-      const updated = await tx.sparePart.update({
-        where: { id: sparePartId },
+      const update = await tx.sparePart.updateMany({
+        where: {
+          id: sparePartId,
+          isActive: true,
+          // BE-E05: NEGATIVE adjustments are guarded atomically: the row is
+          // only touched when physicalStock >= quantity, so it can never go
+          // below zero even under concurrent writes.
+          ...(dto.type === InventoryAdjustmentType.NEGATIVE
+            ? { physicalStock: { gte: dto.quantity } }
+            : {}),
+        },
         data: {
-          physicalStock: newPhysicalStock,
+          physicalStock: { increment: delta },
           // BE-E02: keep the persisted availableStock synchronized with the
           // adjustment so the RN-07 invariant available = physical - reserved
-          // never drifts (prior adjustments only touched physicalStock).
+          // never drifts. reservedStock is never modified here.
           availableStock: { increment: delta },
           lastMovementAt: new Date(),
         },
+      });
+
+      if (update.count === 0) {
+        throw new UnprocessableEntityException(
+          dto.type === InventoryAdjustmentType.NEGATIVE
+            ? 'RN-07: adjustment would result in negative physicalStock'
+            : 'Spare part not found or inactive',
+        );
+      }
+
+      const updated = await tx.sparePart.findUnique({
+        where: { id: sparePartId },
         select: this.selectPublicFields(),
       });
+      if (!updated) throw new UnprocessableEntityException('Spare part not found or inactive');
+
+      // RN-07: physical stock must never drop below reserved stock. Reading
+      // inside the same transaction reflects this transaction's own write; a
+      // violation throws and rolls back the updateMany above atomically.
+      if (updated.physicalStock < updated.reservedStock) {
+        throw new UnprocessableEntityException(
+          `RN-07: adjustment would result in physicalStock (${updated.physicalStock}) below reservedStock (${updated.reservedStock})`,
+        );
+      }
 
       // BE-17: immutable kardex record. Insert-only, never updated or deleted.
       await tx.stockMovement.create({
@@ -183,8 +210,8 @@ export class SparePartRepository {
           quantity: dto.quantity,
           type: 'ADJUSTMENT',
           reason: dto.reason,
-          previousPhysicalStock: part.physicalStock,
-          newPhysicalStock,
+          previousPhysicalStock: updated.physicalStock - delta,
+          newPhysicalStock: updated.physicalStock,
         },
       });
 
