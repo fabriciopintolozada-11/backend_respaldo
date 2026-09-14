@@ -166,6 +166,10 @@ export class SparePartRepository {
         where: { id: sparePartId },
         data: {
           physicalStock: newPhysicalStock,
+          // BE-E02: keep the persisted availableStock synchronized with the
+          // adjustment so the RN-07 invariant available = physical - reserved
+          // never drifts (prior adjustments only touched physicalStock).
+          availableStock: { increment: delta },
           lastMovementAt: new Date(),
         },
         select: this.selectPublicFields(),

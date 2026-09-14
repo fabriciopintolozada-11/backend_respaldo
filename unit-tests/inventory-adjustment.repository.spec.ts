@@ -72,7 +72,7 @@ describe('SparePartRepository.createAdjustment (US-14)', () => {
       expect(tx.sparePart.findUnique).toHaveBeenCalledWith({ where: { id: SPARE_PART_ID } });
       expect(tx.sparePart.update).toHaveBeenCalledWith({
         where: { id: SPARE_PART_ID },
-        data: { physicalStock: 15, lastMovementAt: expect.any(Date) },
+        data: { physicalStock: 15, availableStock: { increment: 5 }, lastMovementAt: expect.any(Date) },
         select: expect.any(Object),
       });
       expect(tx.stockMovement.create).toHaveBeenCalledWith({
@@ -105,7 +105,7 @@ describe('SparePartRepository.createAdjustment (US-14)', () => {
 
       expect(tx.sparePart.update).toHaveBeenCalledWith({
         where: { id: SPARE_PART_ID },
-        data: { physicalStock: 7, lastMovementAt: expect.any(Date) },
+        data: { physicalStock: 7, availableStock: { increment: -3 }, lastMovementAt: expect.any(Date) },
         select: expect.any(Object),
       });
       expect(tx.stockMovement.create).toHaveBeenCalledWith(
