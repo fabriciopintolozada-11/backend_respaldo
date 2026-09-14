@@ -9,8 +9,8 @@ import { QuoteItemType } from '../src/modules/quotes/dto/create-quote.dto';
 // HU-07 / BE-E03: reserved spare parts must never stay permanently blocked.
 // These tests cover the release helper and its integration inside the
 // transactions that move a work order out of the repair flow: ENTREGADA
-// (deliver), RECHAZADA (quote reject) and the re-quote that cleans the
-// previous budget.
+// (deliver), RECHAZADA (quote reject) and the re-quote that supersedes the
+// previous budget (BE-E06 append-only).
 describe('releaseReservedParts (HU-07 / BE-E03)', () => {
   describe('helper', () => {
     const reservedOrder = (parts: unknown[]) => ({
@@ -179,13 +179,14 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
         where: { id: 'quote-part-1' },
         data: { status: 'RELEASED' },
       });
-      expect(tx.quotePart.updateMany).toHaveBeenCalledWith({ where: { quoteId: 'quote-1' }, data: { status: 'RELEASED' } });
+      // BE-E06 / HU-21: only live lines are closed as RELEASED.
+      expect(tx.quotePart.updateMany).toHaveBeenCalledWith({ where: { quoteId: 'quote-1', status: { in: ['PROPOSED', 'RESERVED'] } }, data: { status: 'RELEASED' } });
       expect(tx.workOrder.update).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { status: 'RECHAZADO' } });
     });
   });
 
-  describe('integration: re-quote cleaning the previous budget', () => {
-    it('releases still-reserved parts before deleting the previous quote lines', async () => {
+  describe('integration: re-quote superseding the previous budget', () => {
+    it('releases still-reserved parts before superseding the previous quote lines', async () => {
       const tx = {
         workOrder: {
           findUnique: jest.fn().mockResolvedValue({
@@ -196,7 +197,8 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
           update: jest.fn().mockResolvedValue(undefined),
         },
         quote: {
-          upsert: jest.fn().mockResolvedValue({
+          findUnique: jest.fn().mockResolvedValue({ id: 'quote-1' }),
+          update: jest.fn().mockResolvedValue({
             id: 'quote-1',
             details: [],
             total: new Prisma.Decimal('0'),
@@ -224,6 +226,17 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
       expect(tx.quotePart.update).toHaveBeenCalledWith({
         where: { id: 'old-qp' },
         data: { status: 'RELEASED' },
+      });
+      // BE-E06: the old lines are superseded, never deleted, and the new
+      // proposal is appended on the same quote.
+      const quoteUpdate = tx.quote.update.mock.calls[0][0];
+      expect(quoteUpdate.data.details.updateMany).toEqual({
+        where: { status: 'ACTIVE' },
+        data: { status: 'SUPERSEDED' },
+      });
+      expect(quoteUpdate.data.parts.updateMany).toEqual({
+        where: { status: { notIn: ['INSTALLED', 'SUPERSEDED'] } },
+        data: { status: 'SUPERSEDED' },
       });
     });
   });

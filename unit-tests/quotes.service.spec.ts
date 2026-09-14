@@ -58,7 +58,7 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
 
   // Escenario b) Rechazo por estado inválido de la OT (máquina de estados).
   describe('rejection on invalid work order state (HU-12)', () => {
-    it.each(['FINALIZADO', 'RECIBIDO', 'APROBADO', 'EN_REPARACION', 'RECHAZADO'] as const)(
+    it.each(['FINALIZADO', 'RECIBIDO', 'APROBADO', 'EN_REPARACION'] as const)(
       'throws ConflictException when the order is in %s',
       async (status) => {
         repository.findOrderForQuote.mockResolvedValue({ status });
@@ -67,6 +67,19 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
 
         await expect(service.create('order-1', dto)).rejects.toBeInstanceOf(ConflictException);
         expect(repository.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['PRESUPUESTO_ENVIADO', 'RECHAZADO'] as const)(
+      're-emits the quote (append-only) when the order is in %s (HU-21 / BE-E06)',
+      async (status) => {
+        repository.findOrderForQuote.mockResolvedValue({ status });
+        repository.create.mockResolvedValue(pendingQuote);
+
+        const dto = { items: [{ description: 'x', itemType: QuoteItemType.LABOR, quantity: 1, unitPrice: 10 }] };
+
+        await expect(service.create('order-1', dto)).resolves.toBeDefined();
+        expect(repository.create).toHaveBeenCalledWith('order-1', dto, expect.anything());
       },
     );
 
