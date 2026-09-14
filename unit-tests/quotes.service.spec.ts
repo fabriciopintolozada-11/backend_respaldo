@@ -2,6 +2,7 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config';
 import { QuotesService } from '../src/modules/quotes/quotes.service';
 import { QuoteItemType } from '../src/modules/quotes/dto/create-quote.dto';
+import { ApprovalChannel } from '../src/modules/quotes/dto/approve-quote.dto';
 import { QuoteRepository } from '../src/modules/quotes/repositories/quote.repository';
 
 describe('QuotesService (HU-12 - Generar presupuesto)', () => {
@@ -137,5 +138,32 @@ describe('QuotesService (HU-12 - Generar presupuesto)', () => {
     expect(repository.create).toHaveBeenCalled();
     // Prisma.Decimal stays exact where floating point (0.1 * 0.2 = 0.020000000000000004) would not.
     expect(result.total).toBe('0.02');
+  });
+});
+
+describe('QuotesService quote decisions (HU-09)', () => {
+  it('approves only a quote awaiting customer decision', async () => {
+    const decisionRepository = {
+      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'PRESUPUESTO_ENVIADO' } }),
+      approve: jest.fn().mockResolvedValue({ decision: 'APPROVED' }),
+    };
+    const decisionConfig = { get: jest.fn(() => '65') };
+    const decisionService = new QuotesService(decisionRepository as never, decisionConfig as never);
+
+    await decisionService.approve('order-1', { channel: ApprovalChannel.WHATSAPP, customerName: 'Cliente', notes: 'Autorizado' }, 'user-1');
+
+    expect(decisionRepository.approve).toHaveBeenCalledWith('order-1', { channel: ApprovalChannel.WHATSAPP, customerName: 'Cliente', notes: 'Autorizado' }, 'user-1');
+  });
+
+  it('rejects a decision when the quote is not awaiting approval', async () => {
+    const decisionRepository = {
+      findDecisionContext: jest.fn().mockResolvedValue({ id: 'quote-1', workOrder: { id: 'order-1', status: 'APROBADO' } }),
+      reject: jest.fn(),
+    };
+    const decisionConfig = { get: jest.fn(() => '65') };
+    const decisionService = new QuotesService(decisionRepository as never, decisionConfig as never);
+
+    await expect(decisionService.reject('order-1', { reason: 'Cliente no autoriza' }, 'user-1')).rejects.toBeInstanceOf(ConflictException);
+    expect(decisionRepository.reject).not.toHaveBeenCalled();
   });
 });
