@@ -1,16 +1,16 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { WorkOrderRepository } from '../repositories/work-order.repository';
-import { WorkOrderSettlementResponseDto } from '../dto/work-order-settlement.response.dto';
-import { DeliverWorkOrderDto } from '../dto/deliver-work-order.dto';
-import { DeliverWorkOrderResponseDto } from '../dto/deliver-work-order.response.dto';
-import { ApplyDiscountDto } from '../dto/apply-discount.dto';
-import { VoidAdjustmentDto } from '../dto/void-adjustment.dto';
-import { SettlementAdjustmentResponseDto, AdjustmentType } from '../dto/settlement-adjustment.response.dto';
-import { Prisma } from '../../../generated/prisma/client';
+import { SettlementRepository } from './repositories/settlement.repository';
+import { WorkOrderSettlementResponseDto } from './dto/work-order-settlement.response.dto';
+import { DeliverWorkOrderDto } from './dto/deliver-work-order.dto';
+import { DeliverWorkOrderResponseDto } from './dto/deliver-work-order.response.dto';
+import { ApplyDiscountDto } from './dto/apply-discount.dto';
+import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
+import { SettlementAdjustmentResponseDto, AdjustmentType } from './dto/settlement-adjustment.response.dto';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
-export class SettlementService {
-  constructor(private readonly repository: WorkOrderRepository) {}
+export class SettlementsService {
+  constructor(private readonly repository: SettlementRepository) {}
 
   // US-20: build the consolidated settlement (RN-21) for an order that is
   // ready to be delivered. Only LISTO_ENTREGA is settled; every monetary

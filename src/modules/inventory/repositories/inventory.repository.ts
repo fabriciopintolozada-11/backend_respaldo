@@ -10,7 +10,7 @@ import { QueryInventoryAlertsDto } from '../dto/query-inventory-alerts.dto';
 
 // BE-08: PrismaService is only injected inside repositories.
 @Injectable()
-export class SparePartRepository {
+export class InventoryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll(query: QuerySparePartsDto) {

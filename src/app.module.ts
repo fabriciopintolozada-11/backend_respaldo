@@ -11,8 +11,12 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import Joi from 'joi';
 import { QuotesModule } from './modules/quotes/quotes.module';
-import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 import { WorkBaysModule } from './modules/work-bays/work-bays.module';
+import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { SettlementsModule } from './modules/settlements/settlements.module';
+import { UsersModule } from './modules/users/users.module';
+import { AppConfigModule } from './modules/config/config.module';
 import { PublicTrackingModule } from './modules/public-tracking/public-tracking.module';
 
 @Module({
@@ -36,11 +40,15 @@ import { PublicTrackingModule } from './modules/public-tracking/public-tracking.
     ]),
     JwtModule.register({}), 
     PrismaModule, 
+    AppConfigModule,
+    UsersModule,
     AssignedOrdersModule, 
     AuthModule, 
     QuotesModule, 
-    SparePartsModule,
+    InventoryModule,
     WorkBaysModule,
+    VehiclesModule,
+    SettlementsModule,
     PublicTrackingModule,
   ],
   providers: [

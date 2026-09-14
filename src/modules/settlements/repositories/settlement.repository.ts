@@ -6,7 +6,7 @@ import { DeliverWorkOrderResponseDto } from '../dto/deliver-work-order.response.
 import { ApplyDiscountDto } from '../dto/apply-discount.dto';
 import { VoidAdjustmentDto } from '../dto/void-adjustment.dto';
 import { SettlementAdjustmentResponseDto, AdjustmentType } from '../dto/settlement-adjustment.response.dto';
-import { releaseReservedParts } from './reserved-parts-release';
+import { releaseReservedParts } from '../../work-orders/repositories/reserved-parts-release';
 
 @Injectable()
 export class SettlementRepository {

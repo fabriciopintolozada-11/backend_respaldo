@@ -7,18 +7,15 @@ import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
 import { ReturnSparePartDto } from './dto/return-spare-part.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { CompleteWorkOrderDto } from './dto/complete-work-order.dto';
-import { DeliverWorkOrderDto } from './dto/deliver-work-order.dto';
 import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
 import { ApproveAdditionalFindingDto } from './dto/approve-additional-finding.dto';
 import { RejectAdditionalFindingDto } from './dto/reject-additional-finding.dto';
-import { ApplyDiscountDto } from './dto/apply-discount.dto';
-import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
 import { VehicleReceptionService, STALE_QUOTE_THRESHOLD_DAYS, STALE_QUOTE_REFERENCE } from './services/vehicle-reception.service';
 import { AdditionalFindingsService } from './services/additional-findings.service';
 import { PartReservationService } from './services/part-reservation.service';
 import { WorkOrderCompletionService } from './services/work-order-completion.service';
-import { SettlementService } from './services/settlement.service';
+import { AppConfigService } from '../config/app-config.service';
 
 // BE-P01: the previous single god service was divided by domain into the
 // services wired below. WorkOrdersService remains a thin facade that keeps the
@@ -32,22 +29,15 @@ export class WorkOrdersService {
   private readonly additionalFindings: AdditionalFindingsService;
   private readonly partReservation: PartReservationService;
   private readonly completion: WorkOrderCompletionService;
-  private readonly settlement: SettlementService;
 
   constructor(
     repository: WorkOrderRepository,
     configService: ConfigService,
   ) {
     this.vehicleReception = new VehicleReceptionService(repository);
-    this.additionalFindings = new AdditionalFindingsService(repository, configService);
+    this.additionalFindings = new AdditionalFindingsService(repository, new AppConfigService(configService));
     this.partReservation = new PartReservationService(repository);
     this.completion = new WorkOrderCompletionService(repository);
-    this.settlement = new SettlementService(repository);
-  }
-
-  // US-05 / BE-T05.3: vehicle file with the previous delivered work orders.
-  getVehicleHistory(plate: string) {
-    return this.vehicleReception.getVehicleHistory(plate);
   }
 
   // US-05 / BE-T05.1 + BE-T05.2 + US-16 / RN-06: tracking summary.
@@ -126,21 +116,5 @@ export class WorkOrdersService {
 
   complete(workOrderId: string, userId: string, role: string, dto: CompleteWorkOrderDto) {
     return this.completion.complete(workOrderId, userId, role, dto);
-  }
-
-  getSettlement(workOrderId: string) {
-    return this.settlement.getSettlement(workOrderId);
-  }
-
-  deliver(workOrderId: string, userId: string, dto: DeliverWorkOrderDto) {
-    return this.settlement.deliver(workOrderId, userId, dto);
-  }
-
-  applyDiscount(workOrderId: string, userId: string, dto: ApplyDiscountDto) {
-    return this.settlement.applyDiscount(workOrderId, userId, dto);
-  }
-
-  voidAdjustment(workOrderId: string, userId: string, dto: VoidAdjustmentDto) {
-    return this.settlement.voidAdjustment(workOrderId, userId, dto);
   }
 }

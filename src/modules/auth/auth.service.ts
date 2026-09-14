@@ -5,7 +5,7 @@ import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import type { StringValue } from 'ms';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { UserRepository } from './repositories/user.repository';
+import { UserRepository } from '../users/repositories/user.repository';
 import { RevokedRefreshTokenRepository } from './repositories/revoked-refresh-token.repository';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';

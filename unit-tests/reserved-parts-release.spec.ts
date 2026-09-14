@@ -1,9 +1,9 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '../src/generated/prisma/client';
 import { releaseReservedParts } from '../src/modules/work-orders/repositories/reserved-parts-release';
-import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
+import { SettlementRepository } from '../src/modules/settlements/repositories/settlement.repository';
 import { QuoteRepository } from '../src/modules/quotes/repositories/quote.repository';
-import { PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
+import { PaymentMethod } from '../src/modules/settlements/dto/deliver-work-order.dto';
 import { QuoteItemType } from '../src/modules/quotes/dto/create-quote.dto';
 
 // HU-07 / BE-E03: reserved spare parts must never stay permanently blocked.
@@ -124,7 +124,7 @@ describe('releaseReservedParts (HU-07 / BE-E03)', () => {
         technicalHistory: { create: jest.fn().mockResolvedValue(undefined) },
       };
       const prisma = { $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)) };
-      const repository = new WorkOrderRepository(prisma as never);
+      const repository = new SettlementRepository(prisma as never);
 
       await repository.deliverWorkOrder('wo-1', 'user-1', { paymentMethod: PaymentMethod.CASH, receiptNumber: 'R-1' });
 

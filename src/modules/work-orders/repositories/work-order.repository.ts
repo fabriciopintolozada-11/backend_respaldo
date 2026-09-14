@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { RegisterVehicleEntryDto, WorkOrderResponseDto } from '../dto/register-vehicle-entry.dto';
-import { DeliverWorkOrderDto } from '../dto/deliver-work-order.dto';
-import { DeliverWorkOrderResponseDto } from '../dto/deliver-work-order.response.dto';
 import { AssignWorkOrderResponseDto } from '../dto/assign-work-order.dto';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { DiagnosticResponseDto } from '../dto/diagnostic-response.dto';
@@ -13,25 +11,21 @@ import { SetAwaitingPartDto } from '../dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from '../dto/awaiting-part-response.dto';
 import { CompleteWorkOrderDto } from '../dto/complete-work-order.dto';
 import { CompleteWorkOrderResponseDto } from '../dto/complete-work-order.response.dto';
-import { ApplyDiscountDto } from '../dto/apply-discount.dto';
-import { VoidAdjustmentDto } from '../dto/void-adjustment.dto';
-import { SettlementAdjustmentResponseDto } from '../dto/settlement-adjustment.response.dto';
 import { ApproveAdditionalFindingDto } from '../dto/approve-additional-finding.dto';
 import { RejectAdditionalFindingDto } from '../dto/reject-additional-finding.dto';
 import { AdditionalFindingResponseDto } from '../dto/additional-finding.response.dto';
 import { Prisma } from '../../../generated/prisma/client';
-import { VehicleReceptionRepository, AvailableWorkOrderRow, WorkOrderTrackingRow, VehicleHistoryRow, ActiveMechanicRow } from './vehicle-reception.repository';
+import { VehicleReceptionRepository, AvailableWorkOrderRow, WorkOrderTrackingRow, ActiveMechanicRow } from './vehicle-reception.repository';
 import { AdditionalFindingRepository } from './additional-finding.repository';
 import { PartReservationRepository } from './part-reservation.repository';
 import { WorkOrderCompletionRepository } from './work-order-completion.repository';
-import { SettlementRepository } from './settlement.repository';
 import { WorkOrderAssignmentRepository } from './work-order-assignment.repository';
 
 // BE-P01: the previous single god repository was divided by domain into the
 // repositories listed below. WorkOrderRepository remains a thin facade that
 // keeps the exact public API and constructor used by controllers and tests;
 // the domain quirks live in the focused repositories.
-export type { AvailableWorkOrderRow, WorkOrderTrackingRow, VehicleHistoryRow, ActiveMechanicRow };
+export type { AvailableWorkOrderRow, WorkOrderTrackingRow, ActiveMechanicRow };
 
 @Injectable()
 export class WorkOrderRepository {
@@ -39,7 +33,6 @@ export class WorkOrderRepository {
   private readonly additionalFinding: AdditionalFindingRepository;
   private readonly partReservation: PartReservationRepository;
   private readonly completion: WorkOrderCompletionRepository;
-  private readonly settlement: SettlementRepository;
   private readonly assignment: WorkOrderAssignmentRepository;
 
   constructor(private readonly prisma: PrismaService) {
@@ -47,7 +40,6 @@ export class WorkOrderRepository {
     this.additionalFinding = new AdditionalFindingRepository(prisma);
     this.partReservation = new PartReservationRepository(prisma);
     this.completion = new WorkOrderCompletionRepository(prisma);
-    this.settlement = new SettlementRepository(prisma);
     this.assignment = new WorkOrderAssignmentRepository(prisma);
   }
 
@@ -77,10 +69,6 @@ export class WorkOrderRepository {
 
   countActiveMechanics(): Promise<number> {
     return this.vehicleReception.countActiveMechanics();
-  }
-
-  findVehicleHistory(plate: string): Promise<VehicleHistoryRow | null> {
-    return this.vehicleReception.findVehicleHistory(plate);
   }
 
   findTrackingSummary(filters: {
@@ -180,33 +168,5 @@ export class WorkOrderRepository {
     userId: string,
   ): Promise<CompleteWorkOrderResponseDto> {
     return this.completion.completeWorkOrder(workOrderId, dto, userId);
-  }
-
-  findSettlementContext(workOrderId: string) {
-    return this.settlement.findSettlementContext(workOrderId);
-  }
-
-  deliverWorkOrder(
-    workOrderId: string,
-    userId: string,
-    dto: DeliverWorkOrderDto,
-  ): Promise<DeliverWorkOrderResponseDto> {
-    return this.settlement.deliverWorkOrder(workOrderId, userId, dto);
-  }
-
-  applyDiscount(
-    workOrderId: string,
-    userId: string,
-    dto: ApplyDiscountDto,
-  ): Promise<SettlementAdjustmentResponseDto> {
-    return this.settlement.applyDiscount(workOrderId, userId, dto);
-  }
-
-  voidAdjustment(
-    workOrderId: string,
-    userId: string,
-    dto: VoidAdjustmentDto,
-  ): Promise<SettlementAdjustmentResponseDto> {
-    return this.settlement.voidAdjustment(workOrderId, userId, dto);
   }
 }

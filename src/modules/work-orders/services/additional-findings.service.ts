@@ -1,18 +1,16 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { WorkOrderRepository } from '../repositories/work-order.repository';
 import { CreateDiagnosticDto } from '../dto/create-diagnostic.dto';
 import { ApproveAdditionalFindingDto } from '../dto/approve-additional-finding.dto';
 import { RejectAdditionalFindingDto } from '../dto/reject-additional-finding.dto';
 import { AdditionalFindingResponseDto } from '../dto/additional-finding.response.dto';
-import { Prisma } from '../../../generated/prisma/client';
-import { DEFAULT_LABOR_HOURLY_RATE } from '../../quotes/quotes.service';
+import { AppConfigService } from '../../config/app-config.service';
 
 @Injectable()
 export class AdditionalFindingsService {
   constructor(
     private readonly repository: WorkOrderRepository,
-    private readonly configService: ConfigService,
+    private readonly appConfig: AppConfigService,
   ) {}
 
   async createDiagnostic(id: string, mechanicId: string, dto: CreateDiagnosticDto) {
@@ -45,9 +43,7 @@ export class AdditionalFindingsService {
     if (context.additionalFindings.length === 0) {
       throw new ConflictException('Work order has no additional finding awaiting a decision');
     }
-    const laborHourlyRate = new Prisma.Decimal(
-      this.configService.get<string>('LABOR_HOURLY_RATE') ?? DEFAULT_LABOR_HOURLY_RATE,
-    );
+    const laborHourlyRate = this.appConfig.getLaborHourlyRate();
     return this.repository.approveAdditionalFinding(workOrderId, dto, userId, laborHourlyRate);
   }
 

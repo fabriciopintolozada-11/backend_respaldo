@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
+import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/settlements/dto/deliver-work-order.dto';
 
 describe('DeliverWorkOrderDto (US-20)', () => {
   const createDto = (data: Record<string, unknown>): DeliverWorkOrderDto =>

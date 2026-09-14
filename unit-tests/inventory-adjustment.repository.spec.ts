@@ -1,6 +1,6 @@
 import { UnprocessableEntityException } from '@nestjs/common';
-import { SparePartRepository } from '../src/modules/spare-parts/repositories/spare-part.repository';
-import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../src/modules/spare-parts/dto/create-inventory-adjustment.dto';
+import { InventoryRepository } from '../src/modules/inventory/repositories/inventory.repository';
+import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../src/modules/inventory/dto/create-inventory-adjustment.dto';
 
 const SPARE_PART_ID = 'a1b2c3d4-e5f6-4890-abcd-ef1234567890';
 const USER_ID = 'b2c3d4e5-f6a7-4901-bcde-f12345678901';
@@ -41,10 +41,10 @@ const makeRepository = (tx: ReturnType<typeof makeTx>) => {
   const prisma = {
     $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
   };
-  return { repository: new SparePartRepository(prisma as never), prisma };
+  return { repository: new InventoryRepository(prisma as never), prisma };
 };
 
-describe('SparePartRepository.createAdjustment (US-14)', () => {
+describe('InventoryRepository.createAdjustment (US-14)', () => {
   const positiveDto: CreateInventoryAdjustmentDto = {
     sparePartId: SPARE_PART_ID,
     quantity: 5,

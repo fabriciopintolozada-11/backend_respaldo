@@ -1,4 +1,5 @@
 import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
+import { VehicleRepository } from '../src/modules/vehicles/repositories/vehicle.repository';
 
 describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
   const prisma = {
@@ -188,17 +189,17 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
   });
 });
 
-describe('WorkOrderRepository.findVehicleHistory (US-05 / BE-T05.3)', () => {
+describe('VehicleRepository.findVehicleHistory (US-05 / BE-T05.3)', () => {
   const prisma = {
     workOrder: { findMany: jest.fn() },
     user: { findMany: jest.fn() },
     vehicle: { findUnique: jest.fn() },
   };
-  let repo: WorkOrderRepository;
+  let repo: VehicleRepository;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    repo = new WorkOrderRepository(prisma as never);
+    repo = new VehicleRepository(prisma as never);
   });
 
   it('queries the vehicle by plate filtering only delivered work orders', async () => {
