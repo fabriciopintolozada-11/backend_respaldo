@@ -1,8 +1,8 @@
 import { validate } from 'class-validator';
-import { SparePartCategory } from '../src/modules/spare-parts/dto/spare-part-category.enum';
-import { InventoryAlertType } from '../src/modules/spare-parts/dto/inventory-alert-type.enum';
-import { QueryInventoryAlertsDto } from '../src/modules/spare-parts/dto/query-inventory-alerts.dto';
-import { SparePartsService } from '../src/modules/spare-parts/spare-parts.service';
+import { SparePartCategory } from '../src/modules/inventory/dto/spare-part-category.enum';
+import { InventoryAlertType } from '../src/modules/inventory/dto/inventory-alert-type.enum';
+import { QueryInventoryAlertsDto } from '../src/modules/inventory/dto/query-inventory-alerts.dto';
+import { InventoryService } from '../src/modules/inventory/inventory.service';
 
 const stalePart = {
   id: 'part-1',
@@ -17,7 +17,7 @@ const stalePart = {
 describe('Inventory alerts', () => {
   it('returns a no-rotation alert with days calculated from the real movement date', async () => {
     const repository = { findInventoryAlerts: jest.fn().mockResolvedValue({ data: [stalePart], total: 1 }) };
-    const service = new SparePartsService(repository as never);
+    const service = new InventoryService(repository as never);
 
     const result = await service.findAlerts({ alertType: InventoryAlertType.NO_ROTATION, page: 1, pageSize: 20 });
 
@@ -38,7 +38,7 @@ describe('Inventory alerts', () => {
         total: 1,
       }),
     };
-    const service = new SparePartsService(repository as never);
+    const service = new InventoryService(repository as never);
 
     const result = await service.findAlerts({ alertType: InventoryAlertType.STOCK_OUT });
 
@@ -52,7 +52,7 @@ describe('Inventory alerts', () => {
 
   it('passes search, category and pagination filters to the repository', async () => {
     const repository = { findInventoryAlerts: jest.fn().mockResolvedValue({ data: [], total: 0 }) };
-    const service = new SparePartsService(repository as never);
+    const service = new InventoryService(repository as never);
     const query = { search: 'freno', category: SparePartCategory.FRENOS, page: 2, pageSize: 10 };
 
     await service.findAlerts(query);

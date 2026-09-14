@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import { ApplyDiscountDto } from '../src/modules/work-orders/dto/apply-discount.dto';
+import { ApplyDiscountDto } from '../src/modules/settlements/dto/apply-discount.dto';
 
 describe('ApplyDiscountDto (US-20 / RN-15)', () => {
   const createDto = (data: Record<string, unknown>): ApplyDiscountDto =>

@@ -1,11 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import type { StringValue } from 'ms';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { UserRepository } from './repositories/user.repository';
+import { UserRepository } from '../users/repositories/user.repository';
 import { RevokedRefreshTokenRepository } from './repositories/revoked-refresh-token.repository';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -41,6 +41,8 @@ type VerifiedRefreshToken = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly repository: UserRepository,
     private readonly revocation: RevokedRefreshTokenRepository,
@@ -64,7 +66,7 @@ export class AuthService {
       return await this.buildAuthResponse(user);
     } catch (error: unknown) {
       // Keep the real cause visible during local diagnosis without logging credentials or tokens.
-      console.error('Auth login failed:', error);
+      this.logger.error('Auth login failed:', error instanceof Error ? error.stack : String(error));
       throw error;
     }
   }

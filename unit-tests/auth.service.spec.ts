@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { AuthService } from '../src/modules/auth/auth.service';
-import { UserRepository } from '../src/modules/auth/repositories/user.repository';
+import { UserRepository } from '../src/modules/users/repositories/user.repository';
 import { RevokedRefreshTokenRepository } from '../src/modules/auth/repositories/revoked-refresh-token.repository';
 import { UserRole } from '../src/common/enums/user-role.enum';
 

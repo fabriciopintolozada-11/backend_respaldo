@@ -1,14 +1,14 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
-import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
+import { SettlementRepository } from '../src/modules/settlements/repositories/settlement.repository';
+import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/settlements/dto/deliver-work-order.dto';
 import { Prisma } from '../src/generated/prisma/client';
-import { ApplyDiscountDto } from '../src/modules/work-orders/dto/apply-discount.dto';
-import { VoidAdjustmentDto } from '../src/modules/work-orders/dto/void-adjustment.dto';
+import { ApplyDiscountDto } from '../src/modules/settlements/dto/apply-discount.dto';
+import { VoidAdjustmentDto } from '../src/modules/settlements/dto/void-adjustment.dto';
 
 // US-20 / BE-16 / RN-21 / RN-19: the repository settles and delivers a
 // vehicle as one atomic Prisma transaction. These tests assert the ENTREGADO
 // transition, the charged total and the immutable history entry.
-describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
+describe('SettlementRepository.deliverWorkOrder (US-20)', () => {
   const WORK_ORDER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
   const VEHICLE_ID = 'd4e5f6a7-b8c9-0123-def0-234567890123';
   const USER_ID = 'c3d4e5f6-a7b8-9012-cdef-123456789012';
@@ -63,7 +63,7 @@ describe('WorkOrderRepository.deliverWorkOrder (US-20)', () => {
     const prisma = {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
     };
-    return { repository: new WorkOrderRepository(prisma as never), prisma };
+    return { repository: new SettlementRepository(prisma as never), prisma };
   };
 
   it('sets ENTREGADO, persists payment data and records history (RN-21, RN-19)', async () => {

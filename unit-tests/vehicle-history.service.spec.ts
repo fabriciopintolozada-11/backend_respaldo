@@ -1,13 +1,13 @@
 import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '../src/generated/prisma/client';
-import { WorkOrdersService } from '../src/modules/work-orders/work-orders.service';
-import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
+import { VehiclesService } from '../src/modules/vehicles/vehicles.service';
+import { VehicleRepository } from '../src/modules/vehicles/repositories/vehicle.repository';
 
-describe('WorkOrdersService.getVehicleHistory (US-05 / BE-T05.3)', () => {
+describe('VehiclesService.getVehicleHistory (US-05 / BE-T05.3)', () => {
   const repository = {
     findVehicleHistory: jest.fn(),
   };
-  let service: WorkOrdersService;
+  let service: VehiclesService;
 
   const vehicleRow = {
     id: 'v-1',
@@ -51,7 +51,7 @@ describe('WorkOrdersService.getVehicleHistory (US-05 / BE-T05.3)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkOrdersService(repository as unknown as WorkOrderRepository, { get: jest.fn() } as never);
+    service = new VehiclesService(repository as unknown as VehicleRepository);
   });
 
   it('throws 404 when the vehicle does not exist', async () => {

@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { SparePartsService } from './spare-parts.service';
+import { InventoryService } from './inventory.service';
 import { SparePartResponseDto } from './dto/spare-part.response.dto';
 import { QuerySparePartsDto } from './dto/query-spare-parts.dto';
 import { ListSparePartsResponseDto } from './dto/list-spare-parts.response.dto';
@@ -12,12 +12,14 @@ import { InventoryAdjustmentResponseDto } from './dto/inventory-adjustment-respo
 import { Request } from 'express';
 
 // BE-12.3 (HU-12): inventory catalog used to build budgets with official prices.
+// The /spare-parts route prefix is preserved (BE-P02) to keep the frontend
+// contract unchanged.
 @ApiTags('spare-parts')
 @ApiBearerAuth()
 @Controller('spare-parts')
 @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.MECHANIC, UserRole.ADMIN)
-export class SparePartsController {
-  constructor(private readonly service: SparePartsService) {}
+export class InventoryController {
+  constructor(private readonly service: InventoryService) {}
 
   @Get()
   @ApiOperation({ summary: 'List the active spare parts catalog (HU-12, BE-12.3)' })

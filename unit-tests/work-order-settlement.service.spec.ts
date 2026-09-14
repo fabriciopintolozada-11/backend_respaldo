@@ -1,14 +1,14 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { WorkOrdersService } from '../src/modules/work-orders/work-orders.service';
-import { WorkOrderRepository } from '../src/modules/work-orders/repositories/work-order.repository';
-import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/work-orders/dto/deliver-work-order.dto';
+import { SettlementsService } from '../src/modules/settlements/settlements.service';
+import { SettlementRepository } from '../src/modules/settlements/repositories/settlement.repository';
+import { DeliverWorkOrderDto, PaymentMethod } from '../src/modules/settlements/dto/deliver-work-order.dto';
 import { Prisma } from '../src/generated/prisma/client';
-import { ApplyDiscountDto } from '../src/modules/work-orders/dto/apply-discount.dto';
-import { VoidAdjustmentDto } from '../src/modules/work-orders/dto/void-adjustment.dto';
+import { ApplyDiscountDto } from '../src/modules/settlements/dto/apply-discount.dto';
+import { VoidAdjustmentDto } from '../src/modules/settlements/dto/void-adjustment.dto';
 
-describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
-  let service: WorkOrdersService;
-  let repository: jest.Mocked<WorkOrderRepository>;
+describe('SettlementsService - getSettlement / deliver (US-20)', () => {
+  let service: SettlementsService;
+  let repository: jest.Mocked<SettlementRepository>;
 
   const WORK_ORDER_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
   const USER_ID = 'c3d4e5f6-a7b8-9012-cdef-123456789012';
@@ -66,9 +66,9 @@ describe('WorkOrdersService - getSettlement / deliver (US-20)', () => {
       deliverWorkOrder: jest.fn(),
       applyDiscount: jest.fn(),
       voidAdjustment: jest.fn(),
-    } as unknown as jest.Mocked<WorkOrderRepository>;
+    } as unknown as jest.Mocked<SettlementRepository>;
 
-    service = new WorkOrdersService(repository, { get: jest.fn() } as never);
+    service = new SettlementsService(repository);
   });
 
   describe('getSettlement', () => {

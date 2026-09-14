@@ -4,14 +4,14 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { ListInventoryAlertsResponseDto } from './dto/list-inventory-alerts.response.dto';
 import { QueryInventoryAlertsDto } from './dto/query-inventory-alerts.dto';
-import { SparePartsService } from './spare-parts.service';
+import { InventoryService } from './inventory.service';
 
 @ApiTags('inventory')
 @ApiBearerAuth()
 @Controller('inventory')
 @Roles(UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
 export class InventoryAlertsController {
-  constructor(private readonly service: SparePartsService) {}
+  constructor(private readonly service: InventoryService) {}
 
   @Get('alerts')
   @ApiOperation({ summary: 'List inventory rotation and availability alerts (HU-08, RN-10)' })

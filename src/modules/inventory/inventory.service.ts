@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { SparePartRepository } from './repositories/spare-part.repository';
+import { InventoryRepository } from './repositories/inventory.repository';
 import { SparePartResponseDto } from './dto/spare-part.response.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -16,8 +16,12 @@ import { ListInventoryAlertsResponseDto } from './dto/list-inventory-alerts.resp
 // BE-12.3 (HU-12): catalog lookups used to build quotes with official prices
 // enforced by the backend (BE-12.5).
 @Injectable()
-export class SparePartsService {
-  constructor(private readonly repository: SparePartRepository) {}
+export class InventoryService {
+  // RN-10: a spare part is considered slow-moving when it has not moved for at
+  // least this many days; the repository receives the cutoff date.
+  static readonly ROTATION_LOW_STOCK_DAYS = 60;
+
+  constructor(private readonly repository: InventoryRepository) {}
 
   async findAll(query: QuerySparePartsDto, role: string): Promise<ListSparePartsResponseDto> {
     const page = query.page ?? 1;
@@ -38,7 +42,7 @@ export class SparePartsService {
   async findAlerts(query: QueryInventoryAlertsDto): Promise<ListInventoryAlertsResponseDto> {
     const now = new Date();
     const rotationCutoff = new Date(now);
-    rotationCutoff.setUTCDate(rotationCutoff.getUTCDate() - 60);
+    rotationCutoff.setUTCDate(rotationCutoff.getUTCDate() - InventoryService.ROTATION_LOW_STOCK_DAYS);
     const result = await this.repository.findInventoryAlerts(query, rotationCutoff);
 
     return {

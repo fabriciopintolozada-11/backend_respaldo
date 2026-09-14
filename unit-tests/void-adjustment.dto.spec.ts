@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import { VoidAdjustmentDto } from '../src/modules/work-orders/dto/void-adjustment.dto';
+import { VoidAdjustmentDto } from '../src/modules/settlements/dto/void-adjustment.dto';
 
 describe('VoidAdjustmentDto (US-20 / RN-15)', () => {
   const createDto = (data: Record<string, unknown>): VoidAdjustmentDto =>

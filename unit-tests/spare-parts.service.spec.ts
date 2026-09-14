@@ -1,10 +1,10 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { UserRole } from '../src/common/enums/user-role.enum';
-import { CreateSparePartDto } from '../src/modules/spare-parts/dto/create-spare-part.dto';
-import { QuerySparePartsDto } from '../src/modules/spare-parts/dto/query-spare-parts.dto';
-import { SparePartCategory } from '../src/modules/spare-parts/dto/spare-part-category.enum';
-import { SparePartsService } from '../src/modules/spare-parts/spare-parts.service';
+import { CreateSparePartDto } from '../src/modules/inventory/dto/create-spare-part.dto';
+import { QuerySparePartsDto } from '../src/modules/inventory/dto/query-spare-parts.dto';
+import { SparePartCategory } from '../src/modules/inventory/dto/spare-part-category.enum';
+import { InventoryService } from '../src/modules/inventory/inventory.service';
 
 const part = {
   id: 'part-1',
@@ -19,7 +19,7 @@ const part = {
   lastMovementAt: new Date('2026-09-01T00:00:00Z'),
 };
 
-describe('SparePartsService', () => {
+describe('InventoryService', () => {
   const repository = {
     findAll: jest.fn(),
     count: jest.fn(),
@@ -28,11 +28,11 @@ describe('SparePartsService', () => {
     findForDeactivation: jest.fn(),
     deactivate: jest.fn(),
   };
-  let service: SparePartsService;
+  let service: InventoryService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new SparePartsService(repository as never);
+    service = new InventoryService(repository as never);
   });
 
   it('returns a paginated catalog and filters by role at the response boundary', async () => {

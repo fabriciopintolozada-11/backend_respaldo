@@ -1,8 +1,8 @@
 import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { validate } from 'class-validator';
-import { SparePartsService } from '../src/modules/spare-parts/spare-parts.service';
-import { SparePartRepository } from '../src/modules/spare-parts/repositories/spare-part.repository';
-import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../src/modules/spare-parts/dto/create-inventory-adjustment.dto';
+import { InventoryService } from '../src/modules/inventory/inventory.service';
+import { InventoryRepository } from '../src/modules/inventory/repositories/inventory.repository';
+import { CreateInventoryAdjustmentDto, InventoryAdjustmentType } from '../src/modules/inventory/dto/create-inventory-adjustment.dto';
 
 const SPARE_PART_ID = 'a1b2c3d4-e5f6-4890-abcd-ef1234567890';
 const USER_ID = 'b2c3d4e5-f6a7-4901-bcde-f12345678901';
@@ -27,16 +27,16 @@ const adjustedPart = {
   lastMovementAt: new Date('2026-09-04T12:00:00Z'),
 };
 
-describe('SparePartsService.createAdjustment (US-14)', () => {
-  let service: SparePartsService;
+describe('InventoryService.createAdjustment (US-14)', () => {
+  let service: InventoryService;
   const repository = {
     findById: jest.fn(),
     createAdjustment: jest.fn(),
-  } as unknown as jest.Mocked<SparePartRepository>;
+  } as unknown as jest.Mocked<InventoryRepository>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new SparePartsService(repository);
+    service = new InventoryService(repository);
   });
 
   const baseDto: CreateInventoryAdjustmentDto = {
