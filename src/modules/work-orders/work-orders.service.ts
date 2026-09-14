@@ -21,7 +21,7 @@ import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
-import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response.dto';
+import { ListTrackingWorkOrdersResponseDto } from './dto/list-tracking-work-orders.response.dto';
 import type { VehicleHistoryRow } from './repositories/work-order.repository';
 import { VehicleHistoryConsumedPartDto, VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
 import { Prisma } from '../../generated/prisma/client';
@@ -114,9 +114,14 @@ export class WorkOrdersService {
   // US-16 / RN-06 (BE-T16.1, BE-T16.3): the 15-day staleness threshold and the
   // cutoff are computed here and passed to the repository, which filters at the
   // database level when onlyStaleQuotes=true.
-  async getTrackingSummary(query: QueryTrackingWorkOrdersDto): Promise<WorkOrderTrackingResponseDto[]> {
+  async getTrackingSummary(query: QueryTrackingWorkOrdersDto): Promise<ListTrackingWorkOrdersResponseDto> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const now = Date.now();
-    const rows = await this.repository.findTrackingSummary({
+
+    // BE-E13 / BE-24: page and total come from the same filters so the
+    // frontend can render pagination over the full filtered population.
+    const filters: Parameters<WorkOrderRepository['findTrackingSummary']>[0] = {
       licensePlate: query.licensePlate ? normalizePlate(query.licensePlate) : undefined,
       status: query.status,
       workBayId: query.workBayId,
@@ -124,9 +129,15 @@ export class WorkOrdersService {
         query.onlyStaleQuotes === true
           ? new Date(now - STALE_QUOTE_THRESHOLD_DAYS * 86_400_000)
           : undefined,
-    });
+    };
 
-    return rows.map((row) => {
+    const [rows, total] = await Promise.all([
+      this.repository.findTrackingSummary({ ...filters, page, pageSize }),
+      this.repository.countTrackingSummary(filters),
+    ]);
+
+    return {
+      data: rows.map((row) => {
       let missingPartName: string | null = null;
       let pausedReason: string | null = null;
       let daysWaitingApproval: number | null = null;
@@ -163,7 +174,11 @@ export class WorkOrdersService {
         hasPendingAdditionalFinding: row.additionalFindingDescription !== null,
         additionalFindingDescription: row.additionalFindingDescription,
       };
-    });
+      }),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   // HU-12: the advisor reads the diagnostic for the work order before quoting.
