@@ -217,10 +217,9 @@ export class WorkOrdersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Conclude a repair, set the work order to LISTO_ENTREGA and release its bay (US-19, RN-05, RN-14, RN-19)' })
   @ApiResponse({ status: 200, type: CompleteWorkOrderResponseDto })
-  @ApiResponse({ status: 403, description: 'Insufficient role or work order not assigned to this mechanic (RN-04)' })
   @ApiResponse({ status: 404, description: 'Work order not found' })
   @ApiResponse({ status: 409, description: 'Work order is not in EN_REPARACION status' })
-  @ApiResponse({ status: 422, description: 'Work order is awaiting spare parts and cannot be concluded (RN-05)' })
+  @ApiResponse({ status: 422, description: 'RN-04: not assigned to this mechanic, or RN-05: awaiting spare parts' })
   complete(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteWorkOrderDto,

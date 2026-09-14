@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RegisterVehicleEntryDto } from './dto/register-vehicle-entry.dto';
 import { WorkOrderRepository } from './repositories/work-order.repository';
@@ -419,9 +419,11 @@ export class WorkOrdersService {
     if (!context) throw new NotFoundException('Work order not found');
 
     // RN-04: the mechanic can only conclude work orders assigned to him; the
-    // workshop lead supervises and is always allowed.
+    // workshop lead supervises and is always allowed. BE-E12: RN-04 violations
+    // are consistently reported as 422 across consume-part, awaiting-part and
+    // complete (the role guard itself still returns 403 via @Roles).
     if (role === UserRole.MECHANIC && context.mechanicId !== userId) {
-      throw new ForbiddenException('RN-04: work order is not assigned to this mechanic');
+      throw new UnprocessableEntityException('RN-04: work order is not assigned to this mechanic');
     }
 
     // RN-05: a work order waiting for spare parts must not be concluded.
