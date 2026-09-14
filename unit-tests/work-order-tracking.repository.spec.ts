@@ -2,7 +2,7 @@ import { WorkOrderRepository } from '../src/modules/work-orders/repositories/wor
 
 describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
   const prisma = {
-    workOrder: { findMany: jest.fn() },
+    workOrder: { findMany: jest.fn(), count: jest.fn() },
     user: { findMany: jest.fn() },
     vehicle: { findUnique: jest.fn() },
   };
@@ -115,6 +115,44 @@ describe('WorkOrderRepository.findTrackingSummary (US-05 / BE-T05.1)', () => {
     expect(result.discrepancy).toEqual({
       sparePartName: 'Pastillas de Freno Brembo',
       pausedReason: 'Out of stock',
+    });
+  });
+
+  it('paginates the row set with skip/take when page and pageSize are provided (BE-E13, BE-24)', async () => {
+    prisma.workOrder.findMany.mockResolvedValue([orderRow]);
+    prisma.user.findMany.mockResolvedValue([]);
+
+    await repo.findTrackingSummary({ page: 3, pageSize: 10 });
+
+    expect(prisma.workOrder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 20, take: 10 }),
+    );
+  });
+
+  it('applies the default page and pageSize when none are provided (BE-E13, BE-24)', async () => {
+    prisma.workOrder.findMany.mockResolvedValue([]);
+    prisma.user.findMany.mockResolvedValue([]);
+
+    await repo.findTrackingSummary({});
+
+    expect(prisma.workOrder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 20 }),
+    );
+  });
+
+  it('counts the filtered population with the same where and no pagination (BE-E13, BE-24)', async () => {
+    prisma.workOrder.count.mockResolvedValue(7);
+    const cutoff = new Date('2026-08-22T00:00:00Z');
+
+    const total = await repo.countTrackingSummary({ licensePlate: '4589-KXA', staleQuoteCutoff: cutoff });
+
+    expect(total).toBe(7);
+    expect(prisma.workOrder.count).toHaveBeenCalledWith({
+      where: {
+        vehicle: { is: { plate: '4589-KXA' } },
+        status: 'PRESUPUESTO_ENVIADO',
+        quote: { is: { createdAt: { lte: cutoff } } },
+      },
     });
   });
 

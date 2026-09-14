@@ -4,6 +4,7 @@ import { WorkOrderRepository } from '../src/modules/work-orders/repositories/wor
 describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', () => {
   const repository = {
     findTrackingSummary: jest.fn(),
+    countTrackingSummary: jest.fn().mockResolvedValue(0),
   };
   let service: WorkOrdersService;
 
@@ -39,6 +40,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
 
   it('normalizes the plate and forwards the filters to the repository', async () => {
     repository.findTrackingSummary.mockResolvedValue([]);
+    repository.countTrackingSummary.mockResolvedValue(0);
 
     await service.getTrackingSummary({ licensePlate: ' 4589-kxa ', status: 'EN_REPARACION', workBayId: 'bay-1' });
 
@@ -46,13 +48,23 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       licensePlate: '4589-KXA',
       status: 'EN_REPARACION',
       workBayId: 'bay-1',
+      staleQuoteCutoff: undefined,
+      page: 1,
+      pageSize: 20,
+    });
+    expect(repository.countTrackingSummary).toHaveBeenCalledWith({
+      licensePlate: '4589-KXA',
+      status: 'EN_REPARACION',
+      workBayId: 'bay-1',
+      staleQuoteCutoff: undefined,
     });
   });
 
   it('computes the days in workshop from the immutable entry date', async () => {
     repository.findTrackingSummary.mockResolvedValue([baseRow]);
+    repository.countTrackingSummary.mockResolvedValue(1);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.entryDate).toEqual(new Date('2026-09-01T00:00:00Z'));
     expect(tracking.daysInWorkshop).toBe(5);
@@ -60,6 +72,28 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
     expect(tracking.bayNumber).toBe(1);
     expect(tracking.mechanicName).toBe('Mecánico Uno');
     expect(tracking.customerPhone).toBe('710000000');
+  });
+
+  it('returns the pagination envelope with total (BE-E13, BE-24)', async () => {
+    repository.findTrackingSummary.mockResolvedValue([baseRow]);
+    repository.countTrackingSummary.mockResolvedValue(1);
+
+    const result = await service.getTrackingSummary({ page: 2, pageSize: 10 });
+
+    expect(result).toEqual({
+      data: expect.any(Array),
+      total: 1,
+      page: 2,
+      pageSize: 10,
+    });
+    expect(repository.findTrackingSummary).toHaveBeenCalledWith({
+      licensePlate: undefined,
+      status: undefined,
+      workBayId: undefined,
+      staleQuoteCutoff: undefined,
+      page: 2,
+      pageSize: 10,
+    });
   });
 
   it('reports the missing part and reason for an awaiting-part order (US-13 / RN-05)', async () => {
@@ -74,7 +108,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       },
     ]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.missingPartName).toBe('Amortiguador Delantero a Gas KYB Excel-G');
     expect(tracking.pausedReason).toBe('Part not found in warehouse shelf');
@@ -87,7 +121,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       { ...baseRow, status: 'PRESUPUESTO_ENVIADO', quoteCreatedAt },
     ]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.pausedReason).toBe('Awaiting customer approval');
     expect(tracking.daysWaitingApproval).toBe(3);
@@ -101,7 +135,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       { ...baseRow, status: 'PRESUPUESTO_ENVIADO', quoteCreatedAt },
     ]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.daysWaitingApproval).toBe(17);
     expect(tracking.isStaleQuote).toBe(true);
@@ -112,7 +146,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       { ...baseRow, status: 'EN_REPARACION', quoteCreatedAt: new Date('2026-08-01T00:00:00Z') },
     ]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.daysWaitingApproval).toBeNull();
     expect(tracking.isStaleQuote).toBe(false);
@@ -120,6 +154,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
 
   it('forwards onlyStaleQuotes=false without a stale quote cutoff (US-16 / BE-T16.3)', async () => {
     repository.findTrackingSummary.mockResolvedValue([]);
+    repository.countTrackingSummary.mockResolvedValue(0);
 
     await service.getTrackingSummary({ onlyStaleQuotes: false });
 
@@ -128,11 +163,14 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       status: undefined,
       workBayId: undefined,
       staleQuoteCutoff: undefined,
+      page: 1,
+      pageSize: 20,
     });
   });
 
   it('computes the 15-day cutoff and requests a DB-level filter when onlyStaleQuotes=true (US-16 / BE-T16.3)', async () => {
     repository.findTrackingSummary.mockResolvedValue([]);
+    repository.countTrackingSummary.mockResolvedValue(0);
 
     await service.getTrackingSummary({ onlyStaleQuotes: true });
 
@@ -145,12 +183,17 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
         staleQuoteCutoff: new Date('2026-08-22T00:00:00Z'),
       }),
     );
+    expect(repository.countTrackingSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staleQuoteCutoff: new Date('2026-08-22T00:00:00Z'),
+      }),
+    );
   });
 
   it('keeps pause fields null for a normal in-shop order', async () => {
     repository.findTrackingSummary.mockResolvedValue([baseRow]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.missingPartName).toBeNull();
     expect(tracking.pausedReason).toBeNull();
@@ -168,7 +211,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
       },
     ]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.hasPendingAdditionalFinding).toBe(true);
     expect(tracking.additionalFindingDescription).toBe('Fuga de aceite detectada en el motor');
@@ -178,7 +221,7 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
   it('does not flag the badge when the order has no pending additional finding', async () => {
     repository.findTrackingSummary.mockResolvedValue([baseRow]);
 
-    const [tracking] = await service.getTrackingSummary({});
+    const tracking = (await service.getTrackingSummary({})).data[0];
 
     expect(tracking.hasPendingAdditionalFinding).toBe(false);
     expect(tracking.additionalFindingDescription).toBeNull();
@@ -186,7 +229,13 @@ describe('WorkOrdersService.getTrackingSummary (US-05 / BE-T05.1, BE-T05.2)', ()
 
   it('returns an empty list when no work orders match', async () => {
     repository.findTrackingSummary.mockResolvedValue([]);
+    repository.countTrackingSummary.mockResolvedValue(0);
 
-    await expect(service.getTrackingSummary({ licensePlate: 'ZZZ-999' })).resolves.toEqual([]);
+    await expect(service.getTrackingSummary({ licensePlate: 'ZZZ-999' })).resolves.toEqual({
+      data: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+    });
   });
 });

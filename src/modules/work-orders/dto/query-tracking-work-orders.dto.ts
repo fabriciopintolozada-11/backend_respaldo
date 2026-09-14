@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 // US-05 (RN-05): status vocabulary of the work-order state machine. The same
 // list is used as an allowlist for the tracking filter so queries are explicit.
@@ -45,4 +45,19 @@ export class QueryTrackingWorkOrdersDto {
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   onlyStaleQuotes?: boolean;
+
+  @ApiPropertyOptional({ default: 1, description: 'Page number, 1-based (BE-24)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ default: 20, maximum: 100, description: 'Number of items per page (BE-24)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }

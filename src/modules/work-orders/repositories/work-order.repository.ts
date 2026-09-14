@@ -283,25 +283,23 @@ export class WorkOrderRepository {
   // US-16 / RN-06 (BE-T16.3): when the service passes a staleQuoteCutoff, the
   // query filters at the database to PRESUPUESTO_ENVIADO orders whose quote was
   // emitted before that date (15+ days waiting approval).
+  //
+  // BE-E13 / BE-24: page and pageSize paginate the row set; the same filters
+  // drive countTrackingSummary so total reflects the full filtered population.
   async findTrackingSummary(filters: {
     licensePlate?: string;
     status?: string;
     workBayId?: string;
     staleQuoteCutoff?: Date;
+    page?: number;
+    pageSize?: number;
   }): Promise<WorkOrderTrackingRow[]> {
+    const where = this.buildTrackingWhere(filters);
     const orders = await this.prisma.workOrder.findMany({
-      where: {
-        ...(filters.licensePlate ? { vehicle: { is: { plate: filters.licensePlate } } } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.workBayId ? { currentBay: { is: { id: filters.workBayId } } } : {}),
-        ...(filters.staleQuoteCutoff
-          ? {
-              status: 'PRESUPUESTO_ENVIADO',
-              quote: { is: { createdAt: { lte: filters.staleQuoteCutoff } } },
-            }
-          : {}),
-      },
+      where,
       orderBy: { createdAt: 'desc' },
+      skip: ((filters.page ?? 1) - 1) * (filters.pageSize ?? 20),
+      take: filters.pageSize ?? 20,
       select: {
         id: true,
         status: true,
@@ -359,6 +357,36 @@ export class WorkOrderRepository {
         additionalFindingDescription: pendingFinding?.description ?? null,
       };
     });
+  }
+
+  // BE-E13 / BE-24: total matching rows for the tracking filters, so the
+  // frontend can page the summary (US-05 / US-16 share the same where).
+  async countTrackingSummary(filters: {
+    licensePlate?: string;
+    status?: string;
+    workBayId?: string;
+    staleQuoteCutoff?: Date;
+  }): Promise<number> {
+    return this.prisma.workOrder.count({ where: this.buildTrackingWhere(filters) });
+  }
+
+  private buildTrackingWhere(filters: {
+    licensePlate?: string;
+    status?: string;
+    workBayId?: string;
+    staleQuoteCutoff?: Date;
+  }): Prisma.WorkOrderWhereInput {
+    return {
+      ...(filters.licensePlate ? { vehicle: { is: { plate: filters.licensePlate } } } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.workBayId ? { currentBay: { is: { id: filters.workBayId } } } : {}),
+      ...(filters.staleQuoteCutoff
+        ? {
+            status: 'PRESUPUESTO_ENVIADO',
+            quote: { is: { createdAt: { lte: filters.staleQuoteCutoff } } },
+          }
+        : {}),
+    };
   }
 
   createVehicleEntry(dto: RegisterVehicleEntryDto, receptionistId: string): Promise<WorkOrderResponseDto> {

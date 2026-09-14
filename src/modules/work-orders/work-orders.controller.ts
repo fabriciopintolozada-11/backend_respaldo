@@ -22,7 +22,7 @@ import { QueryWorkOrdersDto } from './dto/query-work-orders.dto';
 import { ListWorkOrdersResponseDto } from './dto/work-order-list.response.dto';
 import { ListMechanicsResponseDto } from './dto/mechanic-list.response.dto';
 import { QueryTrackingWorkOrdersDto } from './dto/query-tracking-work-orders.dto';
-import { WorkOrderTrackingResponseDto } from './dto/work-order-tracking.response.dto';
+import { ListTrackingWorkOrdersResponseDto } from './dto/list-tracking-work-orders.response.dto';
 import { VehicleHistoryResponseDto } from './dto/vehicle-history.response.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { VoidAdjustmentDto } from './dto/void-adjustment.dto';
@@ -54,12 +54,12 @@ export class WorkOrdersController {
 
   // US-05 / BE-T05.1: reactive tracking summary filtered by plate, status or
   // bay for reception and the workshop lead. Declared before any ':id' route
-  // so the literal path wins.
+  // so the literal path wins. BE-E13: paginated envelope (BE-24).
   @Get('work-orders/tracking-summary')
   @Roles(UserRole.RECEPTIONIST, UserRole.WORKSHOP_LEAD, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get work order tracking summary by plate, status or bay (US-05 / BE-T05.1, RN-20)' })
-  @ApiResponse({ status: 200, type: [WorkOrderTrackingResponseDto] })
-  getTrackingSummary(@Query() query: QueryTrackingWorkOrdersDto): Promise<WorkOrderTrackingResponseDto[]> {
+  @ApiResponse({ status: 200, type: ListTrackingWorkOrdersResponseDto })
+  getTrackingSummary(@Query() query: QueryTrackingWorkOrdersDto): Promise<ListTrackingWorkOrdersResponseDto> {
     return this.service.getTrackingSummary(query);
   }
 
