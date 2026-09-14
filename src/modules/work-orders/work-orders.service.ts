@@ -5,6 +5,7 @@ import { WorkOrderRepository } from './repositories/work-order.repository';
 import { normalizePlate, validateVehicleCanBeReceived } from '../../domain/work-orders/vehicle-entry.rules';
 import { CreateDiagnosticDto } from './dto/create-diagnostic.dto';
 import { ConsumeSparePartDto } from './dto/consume-spare-part.dto';
+import { ReturnSparePartDto } from './dto/return-spare-part.dto';
 import { WorkOrderPartResponseDto } from './dto/work-order-part.response.dto';
 import { SetAwaitingPartDto } from './dto/set-awaiting-part.dto';
 import { AwaitingPartResponseDto } from './dto/awaiting-part-response.dto';
@@ -320,6 +321,43 @@ export class WorkOrdersService {
     const nextStatus = context.status === 'APROBADO' ? 'EN_REPARACION' : context.status;
 
     return this.repository.consumePart(workOrderId, dto, userId, nextStatus);
+  }
+
+  // HU-07 / BE-E03: physically return a spare part that was already consumed
+  // in a work order, restoring the discounted stock. All rules live in the
+  // service (BE-06); the repository performs the atomic persistence (BE-16).
+  async returnPart(
+    workOrderId: string,
+    userId: string,
+    role: string,
+    dto: ReturnSparePartDto,
+  ): Promise<WorkOrderPartResponseDto> {
+    const context = await this.repository.findConsumeContext(workOrderId);
+    if (!context) throw new NotFoundException('Work order not found');
+
+    // RN-04: only the assigned mechanic returns parts; the workshop lead
+    // oversees and is always allowed.
+    if (role === UserRole.MECHANIC && context.mechanicId !== userId) {
+      throw new UnprocessableEntityException('RN-04: work order is not assigned to this mechanic');
+    }
+
+    // BE-E03: a part can only be physically returned while the order is still
+    // being worked on. Delivered/settled orders keep their charged parts.
+    if (!['EN_REPARACION', 'EN_ESPERA_DE_REPUESTO'].includes(context.status)) {
+      throw new ConflictException(
+        'Work order must be in EN_REPARACION to return a spare part',
+      );
+    }
+
+    // RN-07: the returned part must belong to this order's quote.
+    const part = context.quote?.parts?.find((item) => item.sparePartId === dto.sparePartId);
+    if (!part) {
+      throw new UnprocessableEntityException(
+        'RN-07: spare part is not associated with this work order',
+      );
+    }
+
+    return this.repository.returnPart(workOrderId, dto, userId);
   }
 
   // US-13: set a work order to EN_ESPERA_DE_REPUESTO when a spare part is

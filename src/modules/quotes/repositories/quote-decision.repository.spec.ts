@@ -48,7 +48,10 @@ describe('QuoteRepository quote decisions', () => {
       }) },
       sparePart: { updateMany: jest.fn() },
       quotePart: { updateMany: jest.fn() },
-      workOrder: { update: jest.fn() },
+      workOrder: {
+        update: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ id: 'order-1', vehicleId: 'vehicle-1', quote: null }),
+      },
       technicalHistory: { create: jest.fn() },
       quoteApproval: { create: jest.fn().mockResolvedValue({ id: 'approval-1', quoteId: 'quote-1', createdAt: new Date() }) },
     };

@@ -7,6 +7,7 @@ import { RejectQuoteDto } from '../dto/reject-quote.dto';
 import { QuoteDecision, QuoteDecisionResponseDto } from '../dto/quote-decision-response.dto';
 import { QuoteResponseDto } from '../dto/quote-response.dto';
 import { QuoteApprovalDetailResponseDto } from '../dto/quote-approval-query-response.dto';
+import { releaseReservedParts } from '../../work-orders/repositories/reserved-parts-release';
 
 @Injectable()
 export class QuoteRepository {
@@ -20,6 +21,11 @@ export class QuoteRepository {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.workOrder.findUnique({ where: { id: workOrderId }, select: { id: true } });
       if (!order) throw new NotFoundException('Work order not found');
+
+      // HU-12 / BE-E03: before cleaning the previous budget (upsert deletes the
+      // quote parts), any part that is still RESERVED for this work order is
+      // released back to the available stock in the same transaction.
+      await releaseReservedParts(tx, workOrderId);
 
       const partIds = dto.items.filter((item) => item.itemType === QuoteItemType.PART).map((item) => item.sparePartId);
       if (partIds.some((id) => !id)) throw new NotFoundException('Part items require a sparePartId');
@@ -228,6 +234,12 @@ export class QuoteRepository {
       if (!quote) throw new NotFoundException('Quote not found');
       if (quote.workOrder.status !== 'PRESUPUESTO_ENVIADO') throw new ConflictException('Quote is not awaiting a decision');
       if (quote.approvals.length > 0) throw new ConflictException('Quote already has a decision');
+
+      // HU-07 / BE-E03: defensively release any part still RESERVED for this
+      // work order before unconditionally marking all lines as RELEASED. In the
+      // normal flow parts are still PROPOSED so the helper is a harmless no-op,
+      // but if the OT somehow retained a reservation it is freed atomically.
+      await releaseReservedParts(tx, workOrderId);
 
       await tx.quotePart.updateMany({ where: { quoteId: quote.id }, data: { status: 'RELEASED' } });
       await tx.workOrder.update({ where: { id: workOrderId }, data: { status: 'RECHAZADO' } });
